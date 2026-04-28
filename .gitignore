@@ -1,0 +1,6 @@
+/target
+*.xml
+*.snap
+gschemas.compiled
+!*.gschema.xml
+!*.gresource.xml
