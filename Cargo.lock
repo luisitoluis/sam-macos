@@ -10,6 +10,7 @@ dependencies = [
  "gtk4",
  "interprocess",
  "libadwaita",
+ "libc",
  "libloading",
  "quick-xml",
  "reqwest",

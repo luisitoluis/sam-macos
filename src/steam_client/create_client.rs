@@ -70,6 +70,40 @@ pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::er
     }
 }
 
+/// macOS version - loads Steam client library.
+/// Uses dlopen under the hood via libloading.
+/// On Apple Silicon, this will load the Linux steamclient.so via Rosetta 2.
+#[cfg(target_os = "macos")]
+pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::error::Error>> {
+    unsafe {
+        let steam_locator_lock = SteamLocator::global();
+        let mut steam_locator = steam_locator_lock.write()?;
+        let steamclient_lib_path = steam_locator
+            .get_lib_path(silent)
+            .ok_or(SamError::UnknownError)?;
+
+        let lib_steamclient = match Library::new(&steamclient_lib_path) {
+            Ok(lib) => lib,
+            Err(e) => {
+                if !silent {
+                    eprintln!(
+                        "[STEAM CLIENT] Failed to open library at {} ({})",
+                        steamclient_lib_path.display(),
+                        e
+                    );
+                    eprintln!("[STEAM CLIENT] Troubleshooting:");
+                    eprintln!("[STEAM CLIENT]   1. Ensure Steam is installed and has been launched at least once");
+                    eprintln!("[STEAM CLIENT]   2. Make sure ~/.local/share/Steam/linux64/steamclient.so exists");
+                    eprintln!("[STEAM CLIENT]   3. If on Apple Silicon, enable Rosetta 2: /usr/sbin/softwareupdate --install-rosetta");
+                }
+                return Err(Box::new(e));
+            }
+        };
+
+        Ok(lib_steamclient)
+    }
+}
+
 pub fn new_steam_client_interface(
     steamclient_so: &Library,
 ) -> Result<

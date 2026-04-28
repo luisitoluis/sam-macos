@@ -51,3 +51,15 @@ pub fn get_app_cache_dir() -> String {
         .expect("Failed to convert temp dir to string")
         .to_owned()
 }
+
+/// macOS version - use standard cache directory
+#[inline]
+#[cfg(target_os = "macos")]
+pub fn get_app_cache_dir() -> String {
+    use std::fs;
+    // Use ~/Library/Caches/samrewritten
+    let home = std::env::var("HOME").expect("Failed to get home dir");
+    let folder = format!("{}/Library/Caches/samrewritten", home);
+    fs::create_dir_all(&folder).expect("Could not create cache folder");
+    folder
+}

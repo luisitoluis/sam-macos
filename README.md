@@ -1,129 +1,107 @@
-SamRewritten
+SamRewritten For macOS (Apple Silicon Fork)
 ===
 
 <p align=center>
-    <img src="/assets/icon_256.png" alt="SamRewrittenLogo">
+    <img src="assets/icon_256.png" alt="SamRewrittenLogo">
 </p>
 
-<p align=center>
-    <img src="/assets/screenshot1.png" alt="SamRewritten screenshot">
-    <em>GTK version preview</em>
-</p>
-
-<p align=center>
-    <img src="/assets/screenshot2.png" alt="SamRewritten screenshot">
-    <em>Adwaita version preview</em>
-</p>
-
-<p align="center">A Steam Achievement Manager for Windows and Linux.</p>
+<p align="center">A Steam Achievement Manager for Windows, Linux, and macOS.</p>
 <p align="center">
-    <a href="https://github.com/PaulCombal/SamRewritten/releases">DOWNLOAD</a>
+    <a href="https://github.com/gentleman-programming/SteamAchievementManager">DOWNLOAD</a>
 </p>
 
 <p align=center>
     <em>
-        This project and its contributors are not affiliated with Valve Corporation or Microsoft.
-        Steam and Windows are trademarks of their respective owners, Valve Corporation and Microsoft.
+        This fork adds native macOS Apple Silicon support to SamRewritten.
     </em>
 </p>
 
-## Thank you
+## What is this fork?
 
-SamRewritten is heavily inspired by other wonderful projects such
-as [Steam Achievements Manager by Gibbed](https://github.com/gibbed/SteamAchievementManager)
-or [Samira by jsnli](https://github.com/jsnli/Samira).
-Thank you to all the contributors of these amazing projects, and
-to [the legacy version of SamRewritten](https://github.com/PaulCombal/SamRewritten-legacy).
+This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) that adds macOS support (Apple Silicon & Intel).
 
-Most importantly, thank you to our awesome users and stargazers for giving us the motivation to keep building.
+**Key features:**
+- ✅ Native macOS support (M1/M2/M3/M4)
+- ✅ Uses Steam Linux client via Rosetta 2
+- ✅ No .NET Framework required
+- ✅ CLI-first (no GTK dependency issues on macOS)
 
-## What is SamRewritten?
+## Requirements
 
-SamRewritten is a tool that allows you to unlock and relock achievements on your Steam account. Additionally, it can edit stats for games and apps that expose them. While achievements carry no financial value, they are widely used for collection progress and "bragging rights"!
+1. **Steam installed** on your Mac
+2. **Rosetta 2** (for Apple Silicon users):
+   ```bash
+   /usr/sbin/softwareupdate --install-rosetta
+   ```
+3. **Rust** (to build from source):
+   ```bash
+   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+   ```
 
 ## Installation
 
-Downloads are available on the [release tab](https://github.com/PaulCombal/SamRewritten/releases) for Windows (installer) and Linux (AppImage).
+### Option 1: Pre-built (if available)
+Download from the [Releases page](https://github.com/gentleman-programming/SteamAchievementManager/releases).
 
-<details>
-<summary>Click here for detailed Windows instructions</summary>
-
-The recommended way to run SamRewritten on Windows is via the official installer.
-You can download it from the Releases page. This is the only file you need; the other listed assets are not intended for general Windows use.
-Once installed, you can find and launch SamRewritten through the Start menu.
-
-If the installation fails or behaves unexpectedly, please report the issue by opening a GitHub issue with as much detail as possible, including your Windows version.
-
-</details>
-
-<details>
-<summary>Click here for detailed Linux instructions</summary>
-
-If your distribution does not provide a native package for SamRewritten, you can use our AppImages.
-AppImages are self-contained executables designed to run on almost any Linux distribution.
-Download the latest AppImage from the Releases page. To run it, ensure the file has execution permissions. You can usually do this by right-clicking the file, navigating to "Permissions," and checking the "Allow executing file as program" box.
-You can then double-click the file to start the app.
-
-If SamRewritten fails to launch, you can troubleshoot by running the AppImage from a terminal to see the logs.
-To do this, open a terminal in your download folder and run the file directly (e.g., ./SamRewritten-gtk.AppImage).
-
-If you see an error regarding "FUSE" or "libfuse," you may need to install the library:
+### Option 2: Build from source
 ```bash
-sudo apt install libfuse2 # Example for Ubuntu/Debian
+# Clone this repository
+git clone https://github.com/gentleman-programming/SteamAchievementManager.git
+cd SteamAchievementManager
+
+# Build for your platform
+# For Apple Silicon (M1/M2/M3/M4):
+cargo build --release --target aarch64-apple-darwin
+
+# For Intel Mac:
+cargo build --release --target x86_64-apple-darwin
+
+# Or universal binary:
+cargo build --release
 ```
 
-If issues persist, please open an issue including your distribution, version, and the console output from your terminal.
+### Note on CLI vs GUI
+This build includes both CLI and GTK GUI, but GTK on macOS can be tricky. If you just need the CLI:
+```bash
+cargo build --release --features cli
+```
 
-</details>
+## How it works on macOS
 
-> [!NOTE]
-> For Arch Linux and its derivatives, you can install SamRewritten with yay:
->
-> `yay -S samrewritten-git`
+Since Valve never released a native `libsteam_api.dylib` for macOS (especially for Apple Silicon), this fork:
 
-## Features
+1. **Locates the Steam installation** in standard macOS locations
+2. **Uses the Linux `steamclient.so`** library
+3. **Runs via Rosetta 2** to translate Linux binaries to ARM64
+4. **Loads the library** via standard `dlopen`
 
-* Lock and unlock specific achievements with a single click
-* Bulk lock/unlock achievements for all or selected apps
-* Schedule achievement unlocks over a custom period
-* Edit statistics in real-time
-* A light and dark theme
+This is the same approach that many other Steam tools use on macOS.
 
-## Limitations
+## Known Issues
 
-⚠️ On Linux, this tool is **only** compatible with:
-* Snap installations of Steam
-* Ubuntu/Debian multiarch installations with apt
-* Ubuntu/Debian installations with the .deb file from the official Steam website
-* Distribution installations that use the Steam runtime (Gentoo, Arch, `~/.steam/root` exists)
+- **Apple Silicon**: Requires Rosetta 2 - the Steam Linux client runs in userspace translation
+- **Intel Macs**: Should work more directly but untested
+- **First launch**: May take a few seconds as Rosetta translates the binary
 
-If you would like to see your specific distribution supported, please open an issue.
+## Troubleshooting
 
-> [!TIP]
-> Flatpak support is a significant technical challenge. If you are familiar with Flatpak internals and would like to help, please reach out!
+### "Could not find steam client library"
+```bash
+# Make sure Steam has been launched at least once
+open -a Steam
 
-## CLI
+# Or set the path manually:
+export SAM_STEAMCLIENT_PATH=~/.local/share/Steam/linux64/steamclient.so
+```
 
-SamRewritten also functions as a command-line tool. The CLI version does not require GTK.
-For Windows users, the installer places the CLI version in the installation folder, though no shortcut is created for it.
+### "Rosetta 2 not installed"
+```bash
+/usr/sbin/softwareupdate --install-rosetta
+```
 
-The CLI allows you to:
+### "Failed to open library"
+Ensure your Steam is installed and you've launched it at least once to generate the necessary files.
 
-* List apps, achievements, and stats
-* Lock and unlock achievements
-* Bulk lock and unlock achievements
+## License
 
-## Environment variables
-
-SamRewritten's behavior can be altered via environment variables:
-* `SAM_STEAM_INSTALL_ROOT` (Linux only) override the detected Steam installation root path.
-* `SAM_STEAMCLIENT_PATH` (Linux only) override which `steamclient.so` file to load.
-* `SAM_GSCHEMA_DIR_FALLBACK` Fallback path for the `gschema.compiled` directory.
-* `SAM_APP_LIST_URL` which URL to download the app list from
-
-## End User Agreement
-
-This software is provided as a Proof-of-Concept. Users are solely responsible for any actions taken with this tool.
-By using SamRewritten, you acknowledge that you alone are responsible for the management of your Steam account. None of the contributors shall be held liable for any repercussions resulting from the use of this software.
-
-Using this tool in multiplayer games is highly discouraged.
+ GPL-3.0 - See LICENSE file.

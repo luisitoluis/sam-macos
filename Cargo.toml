@@ -21,7 +21,8 @@ interprocess = "2"
 libloading = "0"
 
 [features]
-default = ['dep:gtk']
+default = []  # No GUI by default - use 'cli' or 'gui' to enable
+gui = ['dep:gtk']
 adwaita = ['dep:gtk', 'dep:adw']
 cli = ['dep:clap']
 win-console = ['dep:gtk']
@@ -31,6 +32,9 @@ winreg = "0"
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0"
+
+[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+libc = "0"
 
 [package.metadata.appimage]
 icon = "assets/icon_256.png"

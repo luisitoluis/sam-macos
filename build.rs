@@ -16,32 +16,38 @@
 use std::process::Command;
 
 fn main() {
-    let schema_dir = "assets";
+    // Only run glib-compile-schemas on Linux (not Windows, not macOS)
+    #[cfg(target_os = "linux")]
+    {
+        let schema_dir = "assets";
 
-    let status = Command::new("glib-compile-schemas")
-        .arg(schema_dir)
-        .status();
+        let status = Command::new("glib-compile-schemas")
+            .arg(schema_dir)
+            .status();
 
-    match status {
-        Ok(s) if s.success() => {
-            println!("cargo:rerun-if-changed={}", schema_dir);
-        }
-        Ok(s) => {
-            panic!("glib-compile-schemas failed with exit code: {}", s);
-        }
-        Err(e) => {
-            panic!(
-                "Failed to execute glib-compile-schemas: {}. \
-                Make sure GLib development tools are installed.",
-                e
-            );
+        match status {
+            Ok(s) if s.success() => {
+                println!("cargo:rerun-if-changed={}", schema_dir);
+            }
+            Ok(s) => {
+                panic!("glib-compile-schemas failed with exit code: {}", s);
+            }
+            Err(e) => {
+                panic!(
+                    "Failed to execute glib-compile-schemas: {}. \
+                    Make sure GLib development tools are installed.",
+                    e
+                );
+            }
         }
     }
 
-    #[cfg(windows)]
+    #[cfg(target_os = "windows")]
     {
         let mut res = winres::WindowsResource::new();
         res.set_icon("assets/icon.ico");
         res.compile().unwrap();
     }
+
+    // On macOS, we just skip this - no GLib schema compilation needed
 }
