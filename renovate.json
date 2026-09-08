@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
-  ]
+  "extends": ["config:best-practices", ":configMigration"],
+  "labels": ["renovatebot"],
+  "minimumReleaseAge": "1 day",
+  "internalChecksFilter": "strict",
+  "pinDigests": false
 }
