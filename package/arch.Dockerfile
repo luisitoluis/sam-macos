@@ -1,4 +1,4 @@
-FROM archlinux:latest
+FROM archlinux:latest@sha256:b944cc65c5f28665dfd5fdbf5ed2997c88f5bb4a0aefac7ee8a7ef01893e5ed9
 
 # ENV PKGEXT=".pkg.tar.zst" # Default Arch package extension
 
