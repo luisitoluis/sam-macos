@@ -8,7 +8,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Install Rust toolchain
         run: |
@@ -116,7 +116,7 @@ jobs:
         run: Invoke-Expression "& ""C:\Program Files (x86)\NSIS\makensis.exe"" package/windows_installer.nsi"
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: windows-artifact
           path: package/SamRewritten-installer.exe
@@ -125,7 +125,7 @@ jobs:
   build_appimage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Build Docker builder
         run: docker build -t samrewritten-builder -f package/appimage.Dockerfile .
@@ -152,7 +152,7 @@ jobs:
         run: mv target/appimage/samrewritten.AppImage target/appimage/samrewritten-cli.AppImage
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: linux-artifact
           path: target/appimage
@@ -163,13 +163,13 @@ jobs:
     needs: [ build_windows, build_appimage ] # This job depends on both build jobs
     steps:
       - name: Download Windows Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: windows-artifact
           path: ./release_artifacts/windows
 
       - name: Download Linux Artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: linux-artifact
           path: ./release_artifacts/linux
@@ -182,7 +182,7 @@ jobs:
 
       - name: Create Release
         id: create_release # Assign an ID to this step to access its outputs
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           # The tag name for the release. github.ref_name automatically extracts the tag name (e.g., v1.0.0 from refs/tags/v1.0.0)
           tag_name: ${{ github.ref_name }}
