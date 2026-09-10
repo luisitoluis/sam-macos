@@ -1,7 +1,7 @@
 # Heavily inspired from
 # https://github.com/13hannes11/gtk4-rs-docker/blob/main/appimage/Dockerfile
 
-FROM fedora:40@sha256:3c86d25fef9d2001712bc3d9b091fc40cf04be4767e48f1aa3b785bf58d300ed
+FROM fedora:46@sha256:a9bab18d01cf2c2cf62f3e79c72623405bce14ac062995cc6651a3073c802e41
 ARG RUST_VERSION=stable
 ENV RUST_VERSION=$RUST_VERSION
 
