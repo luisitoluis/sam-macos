@@ -116,7 +116,7 @@ jobs:
         run: Invoke-Expression "& ""C:\Program Files (x86)\NSIS\makensis.exe"" package/windows_installer.nsi"
 
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: windows-artifact
           path: package/SamRewritten-installer.exe
@@ -152,7 +152,7 @@ jobs:
         run: mv target/appimage/samrewritten.AppImage target/appimage/samrewritten-cli.AppImage
 
       - name: Upload Linux artifact
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: linux-artifact
           path: target/appimage
