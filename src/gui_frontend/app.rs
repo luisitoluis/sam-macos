@@ -28,10 +28,13 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub fn run(auto_open: Option<u32>) -> u8 {
+    let icon = eframe::icon_data::from_png_bytes(include_bytes!("../../assets/icon_256.png"))
+        .expect("assets/icon_256.png is not a valid PNG");
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1120.0, 740.0])
-            .with_min_inner_size([800.0, 520.0]),
+            .with_min_inner_size([800.0, 520.0])
+            .with_icon(icon),
         ..Default::default()
     };
 
