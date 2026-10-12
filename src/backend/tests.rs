@@ -98,6 +98,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(any(target_os = "linux", target_os = "windows"))]
     fn keyval() {
         #[cfg(target_os = "linux")]
         let home = env::var("HOME").expect("Failed to get home directory");

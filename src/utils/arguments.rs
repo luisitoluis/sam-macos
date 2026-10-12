@@ -15,14 +15,12 @@
 
 use crate::dev_println;
 use interprocess::unnamed_pipe::{Recver, Sender};
-use std::cell::Cell;
 use std::env;
 #[cfg(unix)]
 use std::os::fd::FromRawFd;
 #[cfg(windows)]
 use std::os::windows::io::{FromRawHandle, RawHandle};
 use std::process::exit;
-use std::rc::Rc;
 
 #[derive(Debug)]
 pub struct CliArguments {
@@ -32,9 +30,8 @@ pub struct CliArguments {
     pub tx: Option<Sender>,
 }
 
-#[derive(Debug)]
-pub struct GuiArguments {
-    pub auto_open: Rc<Cell<u32>>,
+pub fn auto_open_app_id() -> Option<u32> {
+    env::args().find_map(|arg| arg.strip_prefix("--auto-open=")?.parse().ok())
 }
 
 pub fn parse_cli_arguments() -> CliArguments {
@@ -74,7 +71,7 @@ pub fn parse_cli_arguments() -> CliArguments {
                     continue;
                 }
 
-                #[cfg(target_os = "linux")]
+                #[cfg(unix)]
                 if key == "--tx" {
                     let raw_handle = value.parse::<i32>().expect("Invalid value for --tx");
                     args.tx = Some(Sender::from_raw_fd(raw_handle));
@@ -89,7 +86,7 @@ pub fn parse_cli_arguments() -> CliArguments {
                     continue;
                 }
 
-                #[cfg(target_os = "linux")]
+                #[cfg(unix)]
                 if key == "--rx" {
                     let raw_handle = value.parse::<i32>().expect("Invalid value for --rx");
                     args.rx = Some(Recver::from_raw_fd(raw_handle));
@@ -117,33 +114,6 @@ pub fn parse_cli_arguments() -> CliArguments {
         std::process::id(),
         args
     );
-
-    args
-}
-
-#[cfg(not(feature = "cli"))]
-pub fn parse_gui_arguments(cmd_line: &gtk::gio::ApplicationCommandLine) -> GuiArguments {
-    use gtk::prelude::ApplicationCommandLineExt;
-
-    let arguments = cmd_line.arguments();
-    let args = GuiArguments {
-        auto_open: Rc::new(Cell::new(0)),
-    };
-
-    for arg in arguments.iter().skip(1) {
-        // Skip the first argument (program name)
-        if let Some(arg_str) = arg.to_str()
-            && arg_str.starts_with("--auto-open=")
-            && let Some(value_str) = arg_str.strip_prefix("--auto-open=")
-        {
-            if let Ok(value) = value_str.parse::<u32>() {
-                args.auto_open.set(value);
-                println!("Parsed --auto-open value: {}", value);
-            } else {
-                eprintln!("Error: Invalid value for --auto-open: {}", value_str);
-            }
-        }
-    }
 
     args
 }

@@ -5,9 +5,9 @@ SamRewritten For macOS (Apple Silicon Fork)
     <img src="assets/icon_256.png" alt="SamRewrittenLogo">
 </p>
 
-<p align="center">A Steam Achievement Manager for Windows, Linux, and macOS.</p>
+<p align="center">A Steam Achievement Manager for macOS.</p>
 <p align="center">
-    <a href="https://github.com/gentleman-programming/SteamAchievementManager">DOWNLOAD</a>
+    <a href="https://github.com/luisitoluis/sam-rust-mac">DOWNLOAD</a>
 </p>
 
 <p align=center>
@@ -24,7 +24,7 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 - ✅ Native macOS support (M1/M2/M3/M4)
 - ✅ Uses Steam Linux client via Rosetta 2
 - ✅ No .NET Framework required
-- ✅ CLI-first (no GTK dependency issues on macOS)
+- ✅ Native macOS window 
 
 ## Requirements
 
@@ -49,21 +49,14 @@ Download from the [Releases page](https://github.com/gentleman-programming/Steam
 git clone https://github.com/gentleman-programming/SteamAchievementManager.git
 cd SteamAchievementManager
 
-# Build for your platform
-# For Apple Silicon (M1/M2/M3/M4):
-cargo build --release --target aarch64-apple-darwin
-
-# For Intel Mac:
-cargo build --release --target x86_64-apple-darwin
-
-# Or universal binary:
+# macOS GUI (Apple Silicon or Intel, for the host you're on):
 cargo build --release
 ```
 
-### Note on CLI vs GUI
-This build includes both CLI and GTK GUI, but GTK on macOS can be tricky. If you just need the CLI:
+The default build is the macOS app. The CLI is a separate build and does not include the window:
+
 ```bash
-cargo build --release --features cli
+cargo build --release --no-default-features --features cli
 ```
 
 ## How it works on macOS

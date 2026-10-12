@@ -92,9 +92,15 @@ pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::er
                         e
                     );
                     eprintln!("[STEAM CLIENT] Troubleshooting:");
-                    eprintln!("[STEAM CLIENT]   1. Ensure Steam is installed and has been launched at least once");
-                    eprintln!("[STEAM CLIENT]   2. Make sure ~/.local/share/Steam/linux64/steamclient.so exists");
-                    eprintln!("[STEAM CLIENT]   3. If on Apple Silicon, enable Rosetta 2: /usr/sbin/softwareupdate --install-rosetta");
+                    eprintln!(
+                        "[STEAM CLIENT]   1. Ensure Steam is installed and has been launched at least once"
+                    );
+                    eprintln!(
+                        "[STEAM CLIENT]   2. Make sure ~/.local/share/Steam/linux64/steamclient.so exists"
+                    );
+                    eprintln!(
+                        "[STEAM CLIENT]   3. If on Apple Silicon, enable Rosetta 2: /usr/sbin/softwareupdate --install-rosetta"
+                    );
                 }
                 return Err(Box::new(e));
             }

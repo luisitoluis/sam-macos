@@ -145,8 +145,13 @@ impl SteamLocator {
 
         if let Some(first_path) = steam_install_paths.first() {
             if !silent {
-                eprintln!("[STEAM LOCATOR] Using Steam client library: {}", first_path.display());
-                eprintln!("[STEAM LOCATOR] Note: If using steamclient.so on Apple Silicon, ensure Rosetta 2 is enabled");
+                eprintln!(
+                    "[STEAM LOCATOR] Using Steam client library: {}",
+                    first_path.display()
+                );
+                eprintln!(
+                    "[STEAM LOCATOR] Note: If using steamclient.so on Apple Silicon, ensure Rosetta 2 is enabled"
+                );
             }
             return Some(first_path.clone());
         }
@@ -155,7 +160,9 @@ impl SteamLocator {
             eprintln!("[STEAM LOCATOR] Warning: Could not find steam client library on macOS");
             eprintln!("[STEAM LOCATOR] Expected locations:");
             eprintln!("[STEAM LOCATOR]   - ~/.local/share/Steam/linux64/steamclient.so");
-            eprintln!("[STEAM LOCATOR]   - ~/Library/Application Support/Steam/linux64/steamclient.so");
+            eprintln!(
+                "[STEAM LOCATOR]   - ~/Library/Application Support/Steam/linux64/steamclient.so"
+            );
         }
 
         None
@@ -246,7 +253,7 @@ impl SteamLocator {
 
         // Standard macOS Steam installation locations
         let potential_dirs = [
-            home_path.join(".local/share/Steam"),                 // Standard
+            home_path.join(".local/share/Steam"),                // Standard
             home_path.join("Library/Application Support/Steam"), // App Store / alternative
         ];
 

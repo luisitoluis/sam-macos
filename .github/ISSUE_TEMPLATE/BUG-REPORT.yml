@@ -40,5 +40,4 @@ body:
       label: "OS"
       description: What is the impacted environment ?
       options:
-        - label: Linux
-        - label: Windows
+        - label: macOS

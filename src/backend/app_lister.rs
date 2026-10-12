@@ -35,7 +35,7 @@ pub struct AppLister<'a> {
     steam_apps: &'a SteamApps,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct AppModel {
     pub app_id: AppId_t,
     pub app_name: String,

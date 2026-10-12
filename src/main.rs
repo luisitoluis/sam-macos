@@ -13,33 +13,36 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#![cfg_attr(
-    all(
-        target_os = "windows",
-        not(feature = "win-console"),
-        not(feature = "cli")
-    ),
-    windows_subsystem = "windows"
-)]
+#[cfg(all(feature = "gui", feature = "cli"))]
+compile_error!(
+    "Build the macOS GUI with `cargo build`, or the CLI with `cargo build --no-default-features --features cli`."
+);
+
+#[cfg(all(not(feature = "gui"), not(feature = "cli")))]
+compile_error!(
+    "Enable the `gui` feature for the macOS app, or build with `--no-default-features --features cli`."
+);
+
+#[cfg(all(feature = "gui", not(feature = "cli"), not(target_os = "macos")))]
+compile_error!(
+    "The GUI is macOS-only. On other systems build the CLI: cargo build --no-default-features --features cli"
+);
 
 mod backend;
 #[cfg(feature = "cli")]
 mod cli_frontend;
-#[cfg(not(feature = "cli"))]
+#[cfg(all(feature = "gui", not(feature = "cli"), target_os = "macos"))]
 mod gui_frontend;
 mod steam_client;
 mod utils;
-
-#[cfg(not(feature = "cli"))]
-const APP_ID: &str = "org.samrewritten.SamRewritten";
 
 #[cfg(feature = "cli")]
 fn main() -> std::process::ExitCode {
     cli_frontend::main()
 }
 
-#[cfg(not(feature = "cli"))]
-fn main() -> gtk::glib::ExitCode {
+#[cfg(all(feature = "gui", not(feature = "cli"), target_os = "macos"))]
+fn main() -> std::process::ExitCode {
     use crate::backend::app::app;
     use crate::backend::orchestrator::orchestrator;
     use crate::utils::arguments::parse_cli_arguments;
@@ -53,19 +56,19 @@ fn main() -> gtk::glib::ExitCode {
         let mut tx = arguments.tx.unwrap();
         let mut rx = arguments.rx.unwrap();
         let exit_code = orchestrator(&mut tx, &mut rx);
-        return gtk::glib::ExitCode::from(exit_code);
+        return std::process::ExitCode::from(exit_code);
     }
 
     if arguments.is_app > 0 {
         let mut tx = arguments.tx.unwrap();
         let mut rx = arguments.rx.unwrap();
         let exit_code = app(arguments.is_app, &mut tx, &mut rx);
-        return gtk::glib::ExitCode::from(exit_code);
+        return std::process::ExitCode::from(exit_code);
     }
 
     let current_exe = get_executable_path();
     let orchestrator = BidirChild::new(Command::new(current_exe).arg("--orchestrator"))
         .expect("Failed to spawn orchestrator process");
 
-    gui_frontend::main_ui(orchestrator)
+    std::process::ExitCode::from(gui_frontend::main_ui(orchestrator))
 }

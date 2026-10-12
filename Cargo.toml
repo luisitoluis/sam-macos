@@ -10,9 +10,8 @@ authors = [
 ]
 
 [dependencies]
-gtk = { version = "0", package = "gtk4", features = ["v4_6"], optional = true }
-adw = { version = "0", package = "libadwaita", features = ["v1_1"], optional = true }
 clap = { version = "4", features = ['derive'], optional = true }
+eframe = { version = "0.33", optional = true }
 quick-xml = { version = "0", features = ["serialize"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -21,11 +20,9 @@ interprocess = "2"
 libloading = "0"
 
 [features]
-default = []  # No GUI by default - use 'cli' or 'gui' to enable
-gui = ['dep:gtk']
-adwaita = ['dep:gtk', 'dep:adw']
-cli = ['dep:clap']
-win-console = ['dep:gtk']
+default = ["gui"]
+gui = ["dep:eframe"]
+cli = ["dep:clap"]
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0"
@@ -33,13 +30,8 @@ winreg = "0"
 [target.'cfg(windows)'.build-dependencies]
 winres = "0"
 
-[target.'cfg(any(target_os = "macos", target_os = "linux"))'.dependencies]
+[target.'cfg(target_os = "macos")'.dependencies]
 libc = "0"
-
-[package.metadata.appimage]
-icon = "assets/icon_256.png"
-desktop_entry = "package/samrewritten.desktop"
-assets = ["assets/gschemas.compiled"]
 
 [profile.release]
 lto = "thin"
