@@ -29,12 +29,6 @@ cli = ["dep:ratatui", "dep:crossterm"]
 name = "sam"
 path = "src/lib.rs"
 
-[target.'cfg(windows)'.dependencies]
-winreg = "0"
-
-[target.'cfg(windows)'.build-dependencies]
-winres = "0"
-
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0"
 

@@ -25,16 +25,6 @@ pub fn get_executable_path() -> PathBuf {
 
 /// This function returns a valid directory where app data can be stored for a longer period of time.
 #[inline]
-#[cfg(target_os = "windows")]
-pub fn get_app_cache_dir() -> String {
-    std::env::temp_dir()
-        .to_str()
-        .expect("Failed to convert temp dir to string")
-        .to_owned()
-}
-
-/// macOS version - use standard cache directory
-#[inline]
 #[cfg(target_os = "macos")]
 pub fn get_app_cache_dir() -> String {
     use std::fs;

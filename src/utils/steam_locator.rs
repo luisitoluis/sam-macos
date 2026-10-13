@@ -55,34 +55,6 @@ impl SteamLocator {
         Err(SamError::UnknownError)
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn get_steamclient_lib_path(_silent: bool) -> Option<PathBuf> {
-        use std::path::PathBuf;
-        use winreg::RegKey;
-        use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
-
-        const REG_PATH: &str = "SOFTWARE\\Valve\\Steam";
-        const VALUE_NAME: &str = "SteamPath";
-
-        // Try HKEY_CURRENT_USER first
-        if let Ok(subkey) = RegKey::predef(HKEY_CURRENT_USER).open_subkey(REG_PATH) {
-            if let Ok(value) = subkey.get_value::<String, _>(VALUE_NAME) {
-                let path = PathBuf::from(value).join("steamclient64.dll");
-                return Some(path);
-            }
-        }
-
-        // Fallback to HKEY_LOCAL_MACHINE
-        if let Ok(subkey) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey(REG_PATH) {
-            if let Ok(value) = subkey.get_value::<String, _>(VALUE_NAME) {
-                let path = PathBuf::from(value).join("steamclient64.dll");
-                return Some(path);
-            }
-        }
-
-        None
-    }
-
     /// macOS version - tries multiple approaches to find a working steam client library.
     /// Note: There is NO official libsteam_api.dylib for Apple Silicon. We try:
     /// 1. Custom SAM_STEAMCLIENT_PATH env var
@@ -136,19 +108,6 @@ impl SteamLocator {
         None
     }
 
-    #[cfg(target_os = "windows")]
-    pub fn get_user_game_stats_schema_prefix() -> Option<String> {
-        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
-
-        let steam_key = RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey("SOFTWARE\\Valve\\Steam")
-            .ok()?;
-
-        let steam_path: String = steam_key.get_value("SteamPath").ok()?;
-
-        Some(steam_path + "/appcache/stats/UserGameStatsSchema_")
-    }
-
     /// macOS: get user game stats schema prefix
     #[cfg(target_os = "macos")]
     pub fn get_user_game_stats_schema_prefix() -> Option<String> {
@@ -182,20 +141,6 @@ impl SteamLocator {
             .into_iter()
             .filter(|path| path.exists())
             .collect()
-    }
-
-    #[cfg(target_os = "windows")]
-    pub fn get_local_app_banner_file_prefix() -> Option<String> {
-        use winreg::RegKey;
-        use winreg::enums::HKEY_CURRENT_USER;
-
-        let subkey = RegKey::predef(HKEY_CURRENT_USER)
-            .open_subkey("SOFTWARE\\Valve\\Steam")
-            .ok()?;
-
-        let value = subkey.get_value::<String, &'static str>("SteamPath").ok()?;
-
-        Some(value + "/appcache/librarycache/")
     }
 
     /// macOS: get local app banner file prefix

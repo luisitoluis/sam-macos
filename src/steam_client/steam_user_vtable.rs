@@ -22,10 +22,7 @@ use std::os::raw::{c_char, c_int, c_void};
 pub struct ISteamUserVTable {
     pub get_h_steam_user: unsafe extern "C" fn(*mut ISteamUser) -> HSteamUser,
     pub b_logged_on: unsafe extern "C" fn(*mut ISteamUser) -> bool,
-    #[cfg(unix)]
     pub get_steam_id: unsafe extern "C" fn(*mut ISteamUser) -> CSteamID,
-    #[cfg(windows)]
-    pub get_steam_id: unsafe extern "C" fn(*mut ISteamUser, *mut u64) -> c_int,
     pub initiate_game_connection_deprecated: unsafe extern "C" fn(
         *mut ISteamUser,
         *mut c_void,

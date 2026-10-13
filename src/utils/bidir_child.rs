@@ -14,13 +14,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::utils::ipc_types::SamError;
-#[cfg(unix)]
 use interprocess::unnamed_pipe::pipe;
 use interprocess::unnamed_pipe::{Recver, Sender};
-#[cfg(unix)]
 use std::os::fd::IntoRawFd;
-#[cfg(windows)]
-use std::os::windows::io::{AsRawHandle, OwnedHandle};
 use std::process::{Child, Command};
 
 #[derive(Debug)]
@@ -31,7 +27,6 @@ pub struct BidirChild {
 }
 
 impl BidirChild {
-    #[cfg(unix)]
     pub fn new(command: &mut Command) -> Result<Self, SamError> {
         let (parent_to_child_tx, parent_to_child_rx) = pipe().expect("Unable to create a pipe");
         let (child_to_parent_tx, child_to_parent_rx) = pipe().expect("Unable to create a pipe");
@@ -48,53 +43,6 @@ impl BidirChild {
                 // We don't need to close the ends we don't need, they are already consumed
                 // drop(parent_to_child_rx);
                 // drop(child_to_parent_tx);
-
-                child
-            }
-            Err(_) => {
-                eprintln!("Unable to spawn a child process");
-                return Err(SamError::UnknownError);
-            }
-        };
-
-        Ok(Self {
-            child,
-            tx: parent_to_child_tx,
-            rx: child_to_parent_rx,
-        })
-    }
-
-    #[cfg(windows)]
-    pub fn new(command: &mut Command) -> Result<Self, SamError> {
-        let (parent_to_child_tx, parent_to_child_rx) =
-            interprocess::os::windows::unnamed_pipe::CreationOptions::default()
-                .inheritable(true)
-                .build()
-                .expect("Failed to create handle");
-        let (child_to_parent_tx, child_to_parent_rx) =
-            interprocess::os::windows::unnamed_pipe::CreationOptions::default()
-                .inheritable(true)
-                .build()
-                .expect("Failed to create handle");
-
-        let child_to_parent_tx_handle: OwnedHandle = child_to_parent_tx.into();
-        let parent_to_child_rx_handle: OwnedHandle = parent_to_child_rx.into();
-
-        let child = match {
-            command
-                .arg(format!(
-                    "--tx={}",
-                    child_to_parent_tx_handle.as_raw_handle() as usize
-                ))
-                .arg(format!(
-                    "--rx={}",
-                    parent_to_child_rx_handle.as_raw_handle() as usize
-                ))
-                .spawn()
-        } {
-            Ok(child) => {
-                drop(parent_to_child_rx_handle);
-                drop(child_to_parent_tx_handle);
 
                 child
             }

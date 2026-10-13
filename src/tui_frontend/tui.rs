@@ -595,16 +595,7 @@ impl App {
             return;
         };
         let url = format!("steam://run/{app_id}");
-        let spawned = {
-            #[cfg(target_os = "macos")]
-            {
-                Command::new("open").arg(&url).spawn()
-            }
-            #[cfg(target_os = "windows")]
-            {
-                Command::new("cmd").args(["/C", "start", "", &url]).spawn()
-            }
-        };
+        let spawned = Command::new("open").arg(&url).spawn();
         self.notice = Some(match spawned {
             Ok(_) => Ok(Message::Phrase(Id::OpeningGame)),
             Err(err) => Err(Message::OpenFailed(err.to_string())),
