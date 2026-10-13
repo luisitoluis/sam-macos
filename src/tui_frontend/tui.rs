@@ -22,7 +22,7 @@ use crossterm::execute;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
-use ratatui::layout::{Constraint, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
@@ -97,7 +97,9 @@ struct App {
     typing: Option<Typing>,
     settings: bool,
     settings_index: usize,
+    help: bool,
     confirm: Option<Confirm>,
+    confirm_accept: bool,
     notice: Option<Result<Message, Message>>,
     language: Language,
     theme: Theme,
@@ -159,7 +161,9 @@ impl App {
             typing: None,
             settings: false,
             settings_index: 1,
+            help: false,
             confirm: None,
+            confirm_accept: false,
             notice: Some(Ok(Message::Phrase(Id::LoadingLibrary))),
             language: Language::from_locale(),
             theme: Theme::Dark,
@@ -289,12 +293,17 @@ impl App {
             self.on_settings_key(key);
             return;
         }
+        if self.help {
+            self.on_help_key(key);
+            return;
+        }
         if let Some(typing) = self.typing {
             self.on_typing_key(typing, key);
             return;
         }
         match key.code {
             KeyCode::Char('q') => self.quit = true,
+            KeyCode::Char('?') => self.help = true,
             KeyCode::Char('s') => self.open_settings(),
             KeyCode::Char('h') if self.pane == Pane::Library => self.hide_junk = !self.hide_junk,
             KeyCode::Char('r') if self.inflight == 0 => self.refresh(),
@@ -307,12 +316,16 @@ impl App {
             }),
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
+            KeyCode::PageUp => self.move_selection(-8),
+            KeyCode::PageDown => self.move_selection(8),
+            KeyCode::Home => self.move_selection(isize::MIN),
+            KeyCode::End => self.move_selection(isize::MAX),
             KeyCode::Enter => self.activate(),
             KeyCode::Esc | KeyCode::Backspace if self.pane == Pane::Game => self.close_game(),
             KeyCode::Tab | KeyCode::BackTab if self.pane == Pane::Game => self.switch_tab(),
             KeyCode::Char(' ') if self.pane == Pane::Game => self.toggle_selected_achievement(),
-            KeyCode::Char('u') if self.pane == Pane::Game => self.confirm = Some(Confirm::UnlockAll),
-            KeyCode::Char('x') if self.pane == Pane::Game => self.confirm = Some(Confirm::Reset),
+            KeyCode::Char('u') if self.pane == Pane::Game => self.ask(Confirm::UnlockAll),
+            KeyCode::Char('x') if self.pane == Pane::Game => self.ask(Confirm::Reset),
             KeyCode::Char('l') if self.pane == Pane::Game => self.launch(),
             KeyCode::Left if self.pane == Pane::Game => self.pane = Pane::Library,
             KeyCode::Right if self.game.is_some() => self.pane = Pane::Game,
@@ -320,23 +333,48 @@ impl App {
         }
     }
 
+    fn ask(&mut self, confirm: Confirm) {
+        self.confirm = Some(confirm);
+        self.confirm_accept = false;
+    }
+
     fn on_confirm_key(&mut self, key: KeyEvent) {
         match key.code {
             KeyCode::Esc | KeyCode::Char('n') | KeyCode::Char('q') => self.confirm = None,
-            KeyCode::Enter | KeyCode::Char('y') => {
-                let confirm = self.confirm.take();
-                if self.inflight == 0
-                    && let Some(game) = self.game.as_mut()
-                {
-                    let app_id = game.app_id;
-                    game.loading = true;
-                    match confirm {
-                        Some(Confirm::UnlockAll) => self.send(Job::UnlockAll(app_id)),
-                        Some(Confirm::Reset) => self.send(Job::Reset(app_id)),
-                        None => {}
-                    }
+            KeyCode::Left | KeyCode::Right | KeyCode::Tab | KeyCode::BackTab => {
+                self.confirm_accept = !self.confirm_accept;
+            }
+            KeyCode::Char('y') => self.accept_confirm(),
+            KeyCode::Enter => {
+                if self.confirm_accept {
+                    self.accept_confirm();
+                } else {
+                    self.confirm = None;
                 }
             }
+            _ => {}
+        }
+    }
+
+    fn accept_confirm(&mut self) {
+        let confirm = self.confirm.take();
+        if self.inflight == 0
+            && let Some(game) = self.game.as_mut()
+        {
+            let app_id = game.app_id;
+            game.loading = true;
+            match confirm {
+                Some(Confirm::UnlockAll) => self.send(Job::UnlockAll(app_id)),
+                Some(Confirm::Reset) => self.send(Job::Reset(app_id)),
+                None => {}
+            }
+        }
+    }
+
+    fn on_help_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc | KeyCode::Char('?') => self.help = false,
+            KeyCode::Char('q') => self.quit = true,
             _ => {}
         }
     }
@@ -437,7 +475,9 @@ impl App {
             if len == 0 {
                 return;
             }
-            let next = (self.library_index as isize + delta).clamp(0, len - 1);
+            let next = (self.library_index as isize)
+                .saturating_add(delta)
+                .clamp(0, len - 1);
             self.library_index = next as usize;
             return;
         }
@@ -455,7 +495,7 @@ impl App {
             GameTab::Achievements => &mut game.achievement_index,
             GameTab::Stats => &mut game.stat_index,
         };
-        *index = (*index as isize + delta).clamp(0, len - 1) as usize;
+        *index = (*index as isize).saturating_add(delta).clamp(0, len - 1) as usize;
     }
 
     fn activate(&mut self) {
@@ -619,14 +659,25 @@ impl App {
             .collect()
     }
 
+    fn overlay(&self) -> bool {
+        self.settings || self.help || self.confirm.is_some()
+    }
+
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
-        let rows = Layout::vertical([Constraint::Min(1), Constraint::Length(2)]).split(area);
-        let columns =
-            Layout::horizontal([Constraint::Percentage(34), Constraint::Percentage(66)]).split(rows[0]);
+        let rows = Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).split(area);
+        let library_width = (area.width as u32 * 34 / 100).clamp(28, 42) as u16;
+        let columns = Layout::horizontal([
+            Constraint::Length(library_width.min(area.width.saturating_sub(24))),
+            Constraint::Min(24),
+        ])
+        .split(rows[0]);
         self.draw_library(frame, columns[0]);
         self.draw_game(frame, columns[1]);
         self.draw_status(frame, rows[1]);
+        if self.help {
+            self.draw_help(frame, area);
+        }
         if self.settings {
             self.draw_settings(frame, area);
         }
@@ -637,12 +688,11 @@ impl App {
 
     fn draw_library(&mut self, frame: &mut Frame, area: Rect) {
         let palette = palette(self.theme);
-        let focused = self.pane == Pane::Library && !self.settings && self.confirm.is_none();
+        let focused = self.pane == Pane::Library && !self.overlay();
         let block = library_block(text::t(self.language, Id::Library), focused, &palette);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let parts = Layout::vertical([
-            Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
@@ -650,81 +700,81 @@ impl App {
         ])
         .split(inner);
 
-        let search = format!(
-            "{}: {}{}",
-            text::t(self.language, Id::SearchGames),
-            self.search,
-            if self.typing == Some(Typing::Search) {
-                "_"
-            } else {
-                ""
-            }
-        );
-        frame.render_widget(Paragraph::new(search).style(palette.fg), parts[0]);
-        let junk = format!(
-            "[{}] {}",
-            if self.hide_junk { "x" } else { " " },
-            text::t(self.language, Id::HideJunk)
-        );
-        frame.render_widget(Paragraph::new(junk).style(palette.dim), parts[1]);
-        let shown = text::shown(self.language, self.visible_apps().len());
         frame.render_widget(
-            Paragraph::new(format!(
-                "{}   {}",
-                text::t(self.language, Id::Refresh),
-                shown
-            ))
-            .style(palette.dim),
-            parts[2],
+            Paragraph::new(query_line(
+                text::t(self.language, Id::SearchGames),
+                &self.search,
+                self.typing == Some(Typing::Search),
+                &palette,
+            )),
+            parts[0],
         );
-
         let apps = self.visible_apps();
-        if self.library_index >= apps.len() {
-            self.library_index = apps.len().saturating_sub(1);
-        }
-        let items: Vec<ListItem> = apps
-            .iter()
-            .map(|app| {
-                let kind = text::t(self.language, kind_id(app.app_type));
-                ListItem::new(vec![
-                    Line::from(app.app_name.as_str()),
-                    Line::from(format!("{} · {kind}", app.app_id)).style(palette.dim),
-                ])
-            })
-            .collect();
-        if apps.is_empty() && self.inflight > 0 {
-            frame.render_widget(
-                Paragraph::new(text::t(self.language, Id::LoadingLibrary)).style(palette.dim),
-                parts[3],
-            );
-        } else {
-            let mut state = ListState::default();
-            if !apps.is_empty() {
-                state.select(Some(self.library_index));
-            }
-            let list = List::new(items)
-                .highlight_style(palette.selected)
-                .highlight_symbol("> ");
-            frame.render_stateful_widget(list, parts[3], &mut state);
-        }
+        let mark = if self.hide_junk { "[x]" } else { "[ ]" };
         frame.render_widget(
             Paragraph::new(Line::from(vec![
                 Span::styled(
-                    format!("Sam {}", env!("CARGO_PKG_VERSION")),
+                    format!("{mark} {}", text::t(self.language, Id::HideJunk)),
                     palette.dim,
                 ),
                 Span::styled(
-                    format!("   ⚙ {}", text::t(self.language, Id::Settings)),
-                    palette.focus,
+                    format!("   {}", text::shown(self.language, apps.len())),
+                    palette.dim,
                 ),
             ])),
-            parts[4],
+            parts[1],
+        );
+
+        if self.library_index >= apps.len() {
+            self.library_index = apps.len().saturating_sub(1);
+        }
+        let open_id = self.game.as_ref().map(|game| game.app_id);
+        if apps.is_empty() {
+            let message = if self.inflight > 0 {
+                text::t(self.language, Id::LoadingLibrary)
+            } else {
+                ""
+            };
+            frame.render_widget(
+                Paragraph::new(message)
+                    .style(palette.dim)
+                    .alignment(Alignment::Left)
+                    .wrap(Wrap { trim: true }),
+                parts[2],
+            );
+        } else {
+            let items: Vec<ListItem> = apps
+                .iter()
+                .map(|app| {
+                    let open = open_id == Some(app.app_id);
+                    let marker = if open { "● " } else { "  " };
+                    let mut label = format!("{marker}{}", app.app_name);
+                    if !matches!(app.app_type, AppModelType::App) {
+                        label.push_str(" · ");
+                        label.push_str(text::t(self.language, kind_id(app.app_type)));
+                    }
+                    ListItem::new(label)
+                })
+                .collect();
+            let mut state = ListState::default();
+            state.select(Some(self.library_index));
+            frame.render_stateful_widget(
+                List::new(items)
+                    .highlight_style(palette.selected)
+                    .highlight_symbol(""),
+                parts[2],
+                &mut state,
+            );
+        }
+        frame.render_widget(
+            Paragraph::new(format!("Sam {}", env!("CARGO_PKG_VERSION"))).style(palette.dim),
+            parts[3],
         );
     }
 
     fn draw_game(&mut self, frame: &mut Frame, area: Rect) {
         let palette = palette(self.theme);
-        let focused = self.pane == Pane::Game && !self.settings && self.confirm.is_none();
+        let focused = self.pane == Pane::Game && !self.overlay();
         let title = self
             .game
             .as_ref()
@@ -734,22 +784,22 @@ impl App {
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let Some(game) = self.game.as_mut() else {
+            let body = Layout::vertical([Constraint::Percentage(35), Constraint::Min(1)]).split(inner);
             frame.render_widget(
                 Paragraph::new(text::t(self.language, Id::SelectGame))
                     .style(palette.dim)
+                    .alignment(Alignment::Center)
                     .wrap(Wrap { trim: true }),
-                inner,
+                body[1],
             );
             return;
         };
         let language = self.language;
         let header = format!(
-            "{} · {} · {}    {}    {}",
+            "{} · {} · {}",
             game.app_id,
             text::t(language, kind_id(game.kind)),
-            game.developer,
-            text::t(language, Id::Launch),
-            text::t(language, Id::Refresh)
+            game.developer
         );
         let achievements_label = text::t(language, Id::Achievements);
         let stats_label = text::t(language, Id::Stats);
@@ -759,6 +809,7 @@ impl App {
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
+            Constraint::Length(3),
         ])
         .split(inner);
         frame.render_widget(Paragraph::new(header).style(palette.dim), parts[0]);
@@ -771,7 +822,7 @@ impl App {
                     palette.dim
                 },
             ),
-            Span::raw(" "),
+            Span::raw("  "),
             Span::styled(
                 format!(" {stats_label} "),
                 if tab == GameTab::Stats {
@@ -790,20 +841,25 @@ impl App {
                     .iter()
                     .filter(|achievement| achievement.is_achieved)
                     .count();
-                let summary = format!(
-                    "{}   {}   {}   {}: {}{}",
-                    text::unlocked(language, unlocked, game.achievements.len()),
-                    text::t(language, Id::UnlockAll),
-                    text::t(language, Id::ResetAll),
-                    text::t(language, Id::FilterAchievements),
-                    game.achievement_query,
-                    if self.typing == Some(Typing::AchievementFilter) {
-                        "_"
-                    } else {
-                        ""
-                    }
+                let bar = progress_bar(unlocked, game.achievements.len(), 10);
+                frame.render_widget(
+                    Paragraph::new(Line::from(vec![
+                        Span::styled(
+                            format!(
+                                "{}  {bar}  ",
+                                text::unlocked(language, unlocked, game.achievements.len())
+                            ),
+                            palette.dim,
+                        ),
+                        query_span(
+                            text::t(language, Id::FilterAchievements),
+                            &game.achievement_query,
+                            self.typing == Some(Typing::AchievementFilter),
+                            &palette,
+                        ),
+                    ])),
+                    parts[2],
                 );
-                frame.render_widget(Paragraph::new(summary).style(palette.fg), parts[2]);
                 let visible = visible_achievements(game);
                 if game.achievement_index >= visible.len() {
                     game.achievement_index = visible.len().saturating_sub(1);
@@ -812,56 +868,57 @@ impl App {
                     .iter()
                     .map(|index| {
                         let achievement = &game.achievements[*index];
-                        let mark = if achievement.is_achieved { "[x]" } else { "[ ]" };
+                        let mark = if achievement.permission != 0 {
+                            "[-]"
+                        } else if achievement.is_achieved {
+                            "[x]"
+                        } else {
+                            "[ ]"
+                        };
                         let name = if achievement.name.is_empty() {
                             achievement.id.as_str()
                         } else {
                             achievement.name.as_str()
                         };
-                        let mut lines = vec![Line::from(format!("{mark} {name}"))];
-                        if !achievement.description.is_empty() {
-                            lines.push(
-                                Line::from(achievement.description.as_str()).style(palette.dim),
-                            );
-                        }
-                        let mut meta = achievement.id.clone();
-                        if achievement.permission != 0 {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::Protected));
-                        }
-                        if let Some(percent) = achievement.global_achieved_percent {
-                            meta.push_str(" · ");
-                            meta.push_str(&text::of_players(language, percent));
-                        }
-                        lines.push(Line::from(meta).style(palette.dim));
-                        ListItem::new(lines)
+                        let percent = achievement
+                            .global_achieved_percent
+                            .map(|percent| format!("  {percent:.0}%"))
+                            .unwrap_or_default();
+                        ListItem::new(format!("{mark} {name}{percent}"))
                     })
                     .collect();
                 let mut state = ListState::default();
                 if !visible.is_empty() {
                     state.select(Some(game.achievement_index));
                 }
-                let list_area = list_area(frame, parts[3], game.loading, language, &palette);
                 frame.render_stateful_widget(
                     List::new(items)
                         .highlight_style(palette.selected)
-                        .highlight_symbol("> "),
-                    list_area,
+                        .highlight_symbol(""),
+                    parts[3],
                     &mut state,
+                );
+                let detail = visible
+                    .get(game.achievement_index)
+                    .map(|index| achievement_detail(&game.achievements[*index], language))
+                    .unwrap_or_default();
+                frame.render_widget(
+                    Paragraph::new(detail)
+                        .style(palette.dim)
+                        .wrap(Wrap { trim: true }),
+                    parts[4],
                 );
             }
             GameTab::Stats => {
-                let summary = format!(
-                    "{}: {}{}",
-                    text::t(language, Id::FilterStats),
-                    game.stat_query,
-                    if self.typing == Some(Typing::StatFilter) {
-                        "_"
-                    } else {
-                        ""
-                    }
+                frame.render_widget(
+                    Paragraph::new(query_line(
+                        text::t(language, Id::FilterStats),
+                        &game.stat_query,
+                        self.typing == Some(Typing::StatFilter),
+                        &palette,
+                    )),
+                    parts[2],
                 );
-                frame.render_widget(Paragraph::new(summary).style(palette.fg), parts[2]);
                 let visible = visible_stats(game);
                 if game.stat_index >= visible.len() {
                     game.stat_index = visible.len().saturating_sub(1);
@@ -879,41 +936,40 @@ impl App {
                             stat.display_name()
                         };
                         let draft = game.drafts.get(id).map(String::as_str).unwrap_or("");
+                        let protected = stat.permission() & 2 != 0;
                         let cursor = if editing && row == game.stat_index {
-                            "_"
+                            "▍"
                         } else {
                             ""
                         };
-                        let mut meta = id.to_string();
-                        if stat.permission() & 2 != 0 {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::Protected));
-                        }
-                        let increment_only = match stat {
-                            StatInfo::Integer(stat) => stat.is_increment_only,
-                            StatInfo::Float(stat) => stat.is_increment_only,
+                        let value = if protected {
+                            draft.to_string()
+                        } else {
+                            format!("[{draft}{cursor}]")
                         };
-                        if increment_only {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::IncrementOnly));
-                        }
-                        ListItem::new(vec![
-                            Line::from(format!("{name}  {draft}{cursor}")),
-                            Line::from(meta).style(palette.dim),
-                        ])
+                        ListItem::new(format!("{name}  {value}"))
                     })
                     .collect();
                 let mut state = ListState::default();
                 if !visible.is_empty() {
                     state.select(Some(game.stat_index));
                 }
-                let list_area = list_area(frame, parts[3], game.loading, language, &palette);
                 frame.render_stateful_widget(
                     List::new(items)
                         .highlight_style(palette.selected)
-                        .highlight_symbol("> "),
-                    list_area,
+                        .highlight_symbol(""),
+                    parts[3],
                     &mut state,
+                );
+                let detail = visible
+                    .get(game.stat_index)
+                    .map(|index| stat_detail(&game.stats[*index], language))
+                    .unwrap_or_default();
+                frame.render_widget(
+                    Paragraph::new(detail)
+                        .style(palette.dim)
+                        .wrap(Wrap { trim: true }),
+                    parts[4],
                 );
             }
         }
@@ -921,30 +977,98 @@ impl App {
 
     fn draw_status(&self, frame: &mut Frame, area: Rect) {
         let palette = palette(self.theme);
-        let message = match &self.notice {
-            Some(Ok(message)) => message.text(self.language),
-            Some(Err(message)) => message.text(self.language),
-            None => text::t(self.language, Id::Ready).to_string(),
+        let block = Block::default()
+            .borders(Borders::TOP)
+            .border_style(palette.border);
+        let inner = block.inner(area);
+        frame.render_widget(block, area);
+        let rows = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(inner);
+        let message = if self.inflight > 0 && !matches!(self.notice, Some(Err(_))) {
+            text::t(self.language, Id::TalkingToSteam).to_string()
+        } else {
+            match &self.notice {
+                Some(Ok(message)) => message.text(self.language),
+                Some(Err(message)) => message.text(self.language),
+                None => text::t(self.language, Id::Ready).to_string(),
+            }
         };
-        let style = if matches!(self.notice, Some(Err(_))) {
+        let style = if matches!(self.notice, Some(Err(_))) && self.inflight == 0 {
             palette.error
         } else {
             palette.fg
         };
-        let hint = if self.confirm.is_some() {
-            "enter  esc"
-        } else if self.settings {
-            "↑↓ enter esc"
-        } else if self.typing.is_some() {
-            "enter  esc"
-        } else if self.pane == Pane::Library {
-            "/  r  h  s  q     ↑↓ enter"
-        } else {
-            "esc  tab  space  u  x  l  /  r  s     ↑↓"
-        };
-        let rows = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(area);
         frame.render_widget(Paragraph::new(message).style(style), rows[0]);
-        frame.render_widget(Paragraph::new(hint).style(palette.dim), rows[1]);
+        frame.render_widget(Paragraph::new(self.hint_line(&palette)), rows[1]);
+    }
+
+    fn hint_line(&self, palette: &Palette) -> Line<'static> {
+        let language = self.language;
+        let commands: Vec<(&str, String)> = if self.confirm.is_some() {
+            vec![
+                ("←→", String::new()),
+                ("enter", String::new()),
+                ("esc", text::t(language, Id::Cancel).to_string()),
+            ]
+        } else if self.settings || self.help {
+            vec![
+                ("↑↓", String::new()),
+                ("enter", String::new()),
+                ("esc", text::t(language, Id::Cancel).to_string()),
+            ]
+        } else if self.typing == Some(Typing::StatValue) {
+            vec![
+                ("enter", text::t(language, Id::Save).to_string()),
+                ("esc", text::t(language, Id::Cancel).to_string()),
+            ]
+        } else if self.typing.is_some() {
+            vec![("esc", text::t(language, Id::Cancel).to_string())]
+        } else if self.pane == Pane::Library {
+            vec![
+                ("?", text::t(language, Id::Help).to_string()),
+                ("/", text::t(language, Id::SearchGames).to_string()),
+                ("r", text::t(language, Id::Refresh).to_string()),
+                ("h", text::t(language, Id::HideJunk).to_string()),
+                ("s", text::t(language, Id::Settings).to_string()),
+                ("q", text::t(language, Id::Quit).to_string()),
+            ]
+        } else if self
+            .game
+            .as_ref()
+            .is_some_and(|game| game.tab == GameTab::Stats)
+        {
+            vec![
+                ("esc", text::t(language, Id::BackLibrary).to_string()),
+                ("tab", text::t(language, Id::Achievements).to_string()),
+                ("enter", text::t(language, Id::Save).to_string()),
+                ("/", text::t(language, Id::FilterStats).to_string()),
+                ("r", text::t(language, Id::Refresh).to_string()),
+                ("?", text::t(language, Id::Help).to_string()),
+            ]
+        } else {
+            vec![
+                ("esc", text::t(language, Id::BackLibrary).to_string()),
+                ("tab", text::t(language, Id::Stats).to_string()),
+                ("space", String::new()),
+                ("u", text::t(language, Id::UnlockAll).to_string()),
+                ("x", text::t(language, Id::ResetAll).to_string()),
+                ("l", text::t(language, Id::Launch).to_string()),
+                ("?", text::t(language, Id::Help).to_string()),
+            ]
+        };
+        let mut spans = Vec::new();
+        for (index, (key, label)) in commands.iter().enumerate() {
+            if index > 0 {
+                spans.push(Span::raw("  "));
+            }
+            spans.push(Span::styled(
+                (*key).to_string(),
+                palette.focus.add_modifier(Modifier::BOLD),
+            ));
+            if !label.is_empty() {
+                spans.push(Span::styled(format!(" {label}"), palette.dim));
+            }
+        }
+        Line::from(spans)
     }
 
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
@@ -992,12 +1116,43 @@ impl App {
         frame.render_widget(Paragraph::new(visible), inner);
     }
 
+    fn draw_help(&self, frame: &mut Frame, area: Rect) {
+        let palette = palette(self.theme);
+        let popup = centered(area, 62, 20);
+        frame.render_widget(Clear, popup);
+        let block = bordered(text::t(self.language, Id::Help), true, &palette);
+        let inner = block.inner(popup);
+        frame.render_widget(block, popup);
+        let language = self.language;
+        let lines = vec![
+            Line::from(text::t(language, Id::Library)).style(palette.focus),
+            help_row("?", text::t(language, Id::Help), &palette),
+            help_row("/", text::t(language, Id::SearchGames), &palette),
+            help_row("↑↓", "j k", &palette),
+            help_row("r", text::t(language, Id::Refresh), &palette),
+            help_row("h", text::t(language, Id::HideJunk), &palette),
+            help_row("s", text::t(language, Id::Settings), &palette),
+            help_row("q", text::t(language, Id::Quit), &palette),
+            Line::from(""),
+            Line::from(text::t(language, Id::Achievements)).style(palette.focus),
+            help_row("esc", text::t(language, Id::BackLibrary), &palette),
+            help_row("tab", text::t(language, Id::Stats), &palette),
+            help_row("space", "[x]", &palette),
+            help_row("u", text::t(language, Id::UnlockAll), &palette),
+            help_row("x", text::t(language, Id::ResetAll), &palette),
+            help_row("l", text::t(language, Id::Launch), &palette),
+            help_row("enter", text::t(language, Id::Save), &palette),
+        ];
+        let height = inner.height as usize;
+        frame.render_widget(Paragraph::new(lines.into_iter().take(height).collect::<Vec<_>>()), inner);
+    }
+
     fn draw_confirm(&self, frame: &mut Frame, area: Rect) {
         let Some(confirm) = self.confirm else {
             return;
         };
         let palette = palette(self.theme);
-        let popup = centered(area, 64, 7);
+        let popup = centered(area, 62, 8);
         frame.render_widget(Clear, popup);
         let block = bordered(text::t(self.language, Id::Confirm), true, &palette);
         let inner = block.inner(popup);
@@ -1006,16 +1161,30 @@ impl App {
             Confirm::UnlockAll => text::t(self.language, Id::UnlockPrompt),
             Confirm::Reset => text::t(self.language, Id::ResetPrompt),
         };
-        let body = format!(
-            "{question}\n\n{}    {}",
-            text::t(self.language, Id::Continue),
-            text::t(self.language, Id::Cancel)
-        );
+        let parts = Layout::vertical([Constraint::Min(1), Constraint::Length(1)]).split(inner);
         frame.render_widget(
-            Paragraph::new(body)
+            Paragraph::new(question)
                 .style(palette.fg)
                 .wrap(Wrap { trim: true }),
-            inner,
+            parts[0],
+        );
+        let cancel = button(
+            text::t(self.language, Id::Cancel),
+            !self.confirm_accept,
+            &palette,
+        );
+        let continue_label = button(
+            text::t(self.language, Id::Continue),
+            self.confirm_accept,
+            &palette,
+        );
+        frame.render_widget(
+            Paragraph::new(Line::from(vec![
+                cancel,
+                Span::raw("   "),
+                continue_label,
+            ])),
+            parts[1],
         );
     }
 }
@@ -1085,22 +1254,80 @@ fn bordered(title: &str, focused: bool, palette: &Palette) -> Block<'static> {
         .border_style(if focused { palette.focus } else { palette.border })
 }
 
-fn list_area(
-    frame: &mut Frame,
-    area: Rect,
-    loading: bool,
-    language: Language,
-    palette: &Palette,
-) -> Rect {
-    if !loading {
-        return area;
+fn query_line(placeholder: &str, value: &str, editing: bool, palette: &Palette) -> Line<'static> {
+    Line::from(query_span(placeholder, value, editing, palette))
+}
+
+fn query_span(placeholder: &str, value: &str, editing: bool, palette: &Palette) -> Span<'static> {
+    let cursor = if editing { "▍" } else { "" };
+    if value.is_empty() && !editing {
+        Span::styled(format!("/ {placeholder}"), palette.dim)
+    } else {
+        Span::styled(format!("/ {value}{cursor}"), palette.fg)
     }
-    let rows = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]).split(area);
-    frame.render_widget(
-        Paragraph::new(text::t(language, Id::TalkingToSteam)).style(palette.dim),
-        rows[0],
-    );
-    rows[1]
+}
+
+fn progress_bar(done: usize, total: usize, width: usize) -> String {
+    if width == 0 {
+        return String::new();
+    }
+    let filled = if total == 0 {
+        0
+    } else {
+        done.saturating_mul(width) / total
+    };
+    let filled = filled.min(width);
+    format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+}
+
+fn achievement_detail(achievement: &AchievementInfo, language: Language) -> String {
+    let mut meta = achievement.id.clone();
+    if achievement.permission != 0 {
+        meta.push_str(" · ");
+        meta.push_str(text::t(language, Id::Protected));
+    }
+    if let Some(percent) = achievement.global_achieved_percent {
+        meta.push_str(" · ");
+        meta.push_str(&text::of_players(language, percent));
+    }
+    if achievement.description.is_empty() {
+        meta
+    } else {
+        format!("{}\n{meta}", achievement.description)
+    }
+}
+
+fn stat_detail(stat: &StatInfo, language: Language) -> String {
+    let mut meta = stat.id().to_string();
+    if stat.permission() & 2 != 0 {
+        meta.push_str(" · ");
+        meta.push_str(text::t(language, Id::Protected));
+    }
+    let increment_only = match stat {
+        StatInfo::Integer(stat) => stat.is_increment_only,
+        StatInfo::Float(stat) => stat.is_increment_only,
+    };
+    if increment_only {
+        meta.push_str(" · ");
+        meta.push_str(text::t(language, Id::IncrementOnly));
+    }
+    meta
+}
+
+fn help_row(key: &str, label: &str, palette: &Palette) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("  {key:<6}"), palette.focus),
+        Span::styled(label.to_string(), palette.dim),
+    ])
+}
+
+fn button(label: &str, focused: bool, palette: &Palette) -> Span<'static> {
+    let text = format!(" {label} ");
+    if focused {
+        Span::styled(text, palette.selected)
+    } else {
+        Span::styled(text, palette.dim)
+    }
 }
 
 fn centered(area: Rect, width: u16, height: u16) -> Rect {

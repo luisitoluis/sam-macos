@@ -44,6 +44,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         options,
         Box::new(move |cc| {
             cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
+            install_cascadia_code(&cc.egui_ctx);
             Ok(Box::new(SamApp::new(auto_open)))
         }),
     ) {
@@ -53,6 +54,36 @@ pub fn run(auto_open: Option<u32>) -> u8 {
             1
         }
     }
+}
+
+fn install_cascadia_code(ctx: &egui::Context) {
+    let Some(bytes) = read_cascadia_code_nf() else {
+        eprintln!("Cascadia Code NF was not found; using the default font");
+        return;
+    };
+
+    let mut fonts = egui::FontDefinitions::default();
+    fonts.font_data.insert(
+        "Cascadia Code NF".to_owned(),
+        std::sync::Arc::new(egui::FontData::from_owned(bytes)),
+    );
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+        fonts
+            .families
+            .entry(family)
+            .or_default()
+            .insert(0, "Cascadia Code NF".to_owned());
+    }
+    ctx.set_fonts(fonts);
+}
+
+fn read_cascadia_code_nf() -> Option<Vec<u8>> {
+    let mut paths = Vec::new();
+    if let Some(home) = std::env::var_os("HOME") {
+        paths.push(std::path::PathBuf::from(home).join("Library/Fonts/CascadiaCodeNF.ttf"));
+    }
+    paths.push(std::path::PathBuf::from("/Library/Fonts/CascadiaCodeNF.ttf"));
+    paths.into_iter().find_map(|path| std::fs::read(path).ok())
 }
 
 enum Job {
