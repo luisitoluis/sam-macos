@@ -15,7 +15,7 @@
 
 use crate::backend::app_lister::{AppModel, AppModelType};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
-use crate::gui_frontend::text::{self, Id, Language, Message};
+use crate::text::{self, Id, Language, Message};
 use crate::gui_frontend::request::{
     GetAchievements, GetStats, GetSubscribedAppList, LaunchApp, Request, ResetStats,
     SetAchievement, SetFloatStat, SetIntStat, Shutdown, StopApp, StoreStatsAndAchievements,

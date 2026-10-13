@@ -15,7 +15,6 @@
 
 mod app;
 mod request;
-mod text;
 
 use crate::gui_frontend::request::Request;
 use crate::utils::bidir_child::BidirChild;

@@ -19,4 +19,5 @@ pub mod cli_frontend;
 #[cfg(all(feature = "gui", target_os = "macos"))]
 pub mod gui_frontend;
 pub mod steam_client;
+pub mod text;
 pub mod utils;
