@@ -20,7 +20,7 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: macos-artifact
-          path: target/release/samrewritten
+          path: target/release/Sam
           retention-days: 1
 
   create_release:
@@ -49,4 +49,4 @@ jobs:
           prerelease: false
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
-            release_artifacts/macos/samrewritten
+            release_artifacts/macos/Sam

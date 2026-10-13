@@ -21,6 +21,7 @@ use serde_json::json;
 
 #[derive(Parser)]
 #[clap(
+    name = "Sam",
     author,
     version,
     long_about = "Steam Achievements Manager Rewritten\nLicensed under GNU GPLv3, Copyright (C) 2026"

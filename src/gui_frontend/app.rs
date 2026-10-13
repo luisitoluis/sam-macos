@@ -39,7 +39,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
     };
 
     match eframe::run_native(
-        "SamRewritten",
+        "Sam",
         options,
         Box::new(move |cc| {
             cc.egui_ctx.set_visuals(egui::Visuals::dark());
@@ -481,7 +481,7 @@ impl SamApp {
             });
 
         ui.separator();
-        ui.weak(format!("SamRewritten {}", env!("CARGO_PKG_VERSION")));
+        ui.weak(format!("Sam {}", env!("CARGO_PKG_VERSION")));
         actions
     }
 
@@ -564,17 +564,19 @@ impl Drop for SamApp {
 }
 
 impl eframe::App for SamApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.poll(ctx);
+    }
 
+    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let mut actions = Vec::new();
-        egui::TopBottomPanel::bottom("status").show(ctx, |ui| self.status_ui(ui));
-        egui::SidePanel::left("library")
+        egui::Panel::bottom("status").show(ui, |ui| self.status_ui(ui));
+        egui::Panel::left("library")
             .resizable(true)
-            .default_width(320.0)
-            .show(ctx, |ui| actions.extend(self.library_ui(ui)));
-        egui::CentralPanel::default().show(ctx, |ui| actions.extend(self.game_ui(ui)));
-        actions.extend(self.confirm_ui(ctx));
+            .default_size(320.0)
+            .show(ui, |ui| actions.extend(self.library_ui(ui)));
+        egui::CentralPanel::default().show(ui, |ui| actions.extend(self.game_ui(ui)));
+        actions.extend(self.confirm_ui(ui.ctx()));
 
         for action in actions {
             self.apply(action);
