@@ -10,7 +10,7 @@ fi
 
 bin_name="${CARGO_BIN_NAME:-}"
 case "$bin_name" in
-    Sam | sam-cli | sam_cli) ;;
+    Sam | Sam-tui | Sam_tui) ;;
     *) exit 0 ;;
 esac
 

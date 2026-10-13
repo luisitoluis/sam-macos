@@ -22,7 +22,7 @@ jobs:
           name: macos-artifact
           path: |
             target/release/Sam
-            target/release/sam-cli
+            target/release/Sam-tui
           retention-days: 1
 
   create_release:
@@ -45,7 +45,7 @@ jobs:
 
             This release includes:
             - macOS GUI
-            - sam-cli
+            - Sam-tui
             - Built on ${{ github.sha }}
 
           draft: true
@@ -53,4 +53,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             release_artifacts/macos/Sam
-            release_artifacts/macos/sam-cli
+            release_artifacts/macos/Sam-tui

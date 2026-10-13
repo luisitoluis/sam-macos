@@ -41,6 +41,6 @@ path = "src/main.rs"
 required-features = ["gui"]
 
 [[bin]]
-name = "sam-cli"
-path = "src/bin/sam-cli.rs"
+name = "Sam-tui"
+path = "src/bin/sam-tui.rs"
 required-features = ["cli"]
