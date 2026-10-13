@@ -604,10 +604,6 @@ impl App {
             {
                 Command::new("cmd").args(["/C", "start", "", &url]).spawn()
             }
-            #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-            {
-                Command::new("xdg-open").arg(&url).spawn()
-            }
         };
         self.notice = Some(match spawned {
             Ok(_) => Ok(Message::Phrase(Id::OpeningGame)),

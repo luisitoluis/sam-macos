@@ -55,38 +55,6 @@ impl SteamLocator {
         Err(SamError::UnknownError)
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn get_steamclient_lib_path(silent: bool) -> Option<PathBuf> {
-        use std::path::Path;
-
-        if let Ok(path_str) = std::env::var("SAM_STEAMCLIENT_PATH") {
-            return Some(Path::new(&path_str).to_owned());
-        }
-
-        if let Ok(real_home) = std::env::var("SNAP_REAL_HOME") {
-            let path_str =
-                real_home + "/snap/steam/common/.local/share/Steam/linux64/steamclient.so";
-            return Some(Path::new(&path_str).to_owned());
-        }
-
-        let steam_install_paths: Vec<PathBuf> = Self::get_local_steam_install_root_folders()
-            .into_iter()
-            .map(|path| path.join("linux64/steamclient.so"))
-            .filter(|path| path.exists())
-            .collect();
-
-        let first_path = steam_install_paths.first()?;
-
-        if !silent && steam_install_paths.len() > 1 {
-            eprintln!("[STEAM LOCATOR] Found multiple Steam installations. Using the first one.");
-            for path in &steam_install_paths {
-                eprintln!("[STEAM LOCATOR] - {}", path.display());
-            }
-        }
-
-        Some(first_path.clone())
-    }
-
     #[cfg(target_os = "windows")]
     pub fn get_steamclient_lib_path(_silent: bool) -> Option<PathBuf> {
         use std::path::PathBuf;
@@ -168,23 +136,6 @@ impl SteamLocator {
         None
     }
 
-    #[cfg(target_os = "linux")]
-    fn get_user_game_stats_schema_prefix() -> Option<String> {
-        if let Ok(real_home) = std::env::var("SNAP_REAL_HOME") {
-            let full_path = real_home
-                + "/snap/steam/common/.local/share/Steam/appcache/stats/UserGameStatsSchema_";
-            return Some(full_path);
-        }
-
-        let dirs = Self::get_local_steam_install_root_folders();
-
-        if dirs.is_empty() {
-            return None;
-        }
-
-        Some(dirs[0].to_str()?.to_owned() + "/appcache/stats/UserGameStatsSchema_")
-    }
-
     #[cfg(target_os = "windows")]
     pub fn get_user_game_stats_schema_prefix() -> Option<String> {
         use winreg::{RegKey, enums::HKEY_CURRENT_USER};
@@ -210,36 +161,6 @@ impl SteamLocator {
         }
     }
 
-    #[cfg(target_os = "linux")]
-    pub fn get_local_steam_install_root_folders() -> Vec<PathBuf> {
-        use std::path::PathBuf;
-
-        if let Ok(real_home) = std::env::var("SNAP_REAL_HOME") {
-            let prefix = PathBuf::from(real_home).join("snap/steam/common/.local/share/Steam");
-            return vec![prefix];
-        }
-
-        if let Ok(path) = std::env::var("SAM_STEAM_INSTALL_ROOT") {
-            return vec![PathBuf::from(path)];
-        }
-
-        let home = std::env::var("HOME").expect("Failed to get home dir");
-        let home_path = PathBuf::from(home);
-
-        let potential_dirs = [
-            home_path.join("snap/steam/common/.local/share/Steam"),
-            home_path.join(".local/share/Steam"),
-            home_path.join(".steam/steam"),
-            home_path.join(".steam/debian-installation"),
-            home_path.join(".steam/root"),
-        ];
-
-        potential_dirs
-            .into_iter()
-            .filter(|path| path.exists() && !path.is_symlink())
-            .collect()
-    }
-
     /// macOS: get local Steam installation root folders
     #[cfg(target_os = "macos")]
     pub fn get_local_steam_install_root_folders() -> Vec<PathBuf> {
@@ -261,17 +182,6 @@ impl SteamLocator {
             .into_iter()
             .filter(|path| path.exists())
             .collect()
-    }
-
-    #[cfg(target_os = "linux")]
-    pub fn get_local_app_banner_file_prefix() -> Option<String> {
-        let dirs = Self::get_local_steam_install_root_folders();
-
-        if dirs.is_empty() {
-            None
-        } else {
-            Some(dirs[0].to_str()?.to_owned() + "/appcache/librarycache/")
-        }
     }
 
     #[cfg(target_os = "windows")]

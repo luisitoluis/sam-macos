@@ -3,13 +3,11 @@
 *.toml
 *.md
 *.yaml
-*.snap
 *.xml
 *.png
 assets/*
 doc/*
 package/*
-snap/*
 target/*
 LICENSE
 

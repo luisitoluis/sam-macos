@@ -26,30 +26,6 @@ use std::sync::OnceLock;
 
 static STEAM_CLIENT_LIB: OnceLock<Library> = OnceLock::new(); // Make the lifetime 'static
 
-#[cfg(target_os = "linux")]
-pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::error::Error>> {
-    unsafe {
-        let steam_locator_lock = SteamLocator::global();
-        let mut steam_locator = steam_locator_lock.write()?;
-        let steamclient_lib_path = steam_locator
-            .get_lib_path(silent)
-            .ok_or(SamError::UnknownError)?;
-
-        let lib_steamclient = match Library::new(&steamclient_lib_path) {
-            Ok(lib) => lib,
-            Err(e) => {
-                eprintln!(
-                    "[STEAM CLIENT] Failed to open shared object at {} ({e})",
-                    steamclient_lib_path.display()
-                );
-                return Err(Box::new(e));
-            }
-        };
-
-        Ok(lib_steamclient)
-    }
-}
-
 #[cfg(target_os = "windows")]
 pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::error::Error>> {
     use libloading::os::windows::{

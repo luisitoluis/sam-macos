@@ -17,9 +17,12 @@
 mod tests {
     use crate::backend::app_manager::AppManager;
     use crate::backend::connected_steam::ConnectedSteam;
+    #[cfg(target_os = "windows")]
     use crate::backend::key_value::KeyValue;
     use crate::steam_client::steam_apps_001_wrapper::SteamApps001AppDataKeys;
+    #[cfg(target_os = "windows")]
     use std::env;
+    #[cfg(target_os = "windows")]
     use std::path::PathBuf;
 
     #[test]
@@ -98,18 +101,10 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(target_os = "linux", target_os = "windows"))]
+    #[cfg(target_os = "windows")]
     fn keyval() {
-        #[cfg(target_os = "linux")]
-        let home = env::var("HOME").expect("Failed to get home directory");
-        #[cfg(target_os = "linux")]
-        let bin_file = PathBuf::from(
-            home + "/snap/steam/common/.local/share/Steam/appcache/stats/UserGameStatsSchema_730.bin",
-        );
-        #[cfg(target_os = "windows")]
         let program_files =
             env::var("ProgramFiles(x86)").expect("Failed to get Program Files directory");
-        #[cfg(target_os = "windows")]
         let bin_file =
             PathBuf::from(program_files + "\\Steam\\appcache\\stats\\UserGameStatsSchema_480.bin");
 

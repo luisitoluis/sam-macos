@@ -14,5 +14,5 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 fn main() -> std::process::ExitCode {
-    sam::cli_frontend::main()
+    sam::tui_frontend::main()
 }
