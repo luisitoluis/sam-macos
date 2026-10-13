@@ -1,4 +1,4 @@
-SamRewritten For macOS (Apple Silicon Fork)
+Steam Achievement Manager For macOS 
 ===
 
 <p align=center>
@@ -53,11 +53,7 @@ cd SteamAchievementManager
 cargo build --release
 ```
 
-The default build is the macOS app. The CLI is a separate build and does not include the window:
-
-```bash
-cargo build --release --no-default-features --features cli
-```
+`cargo build --release` produces both programs: `target/release/Sam` (the window) and `target/release/sam-cli` (the terminal).
 
 ## How it works on macOS
 

@@ -53,14 +53,18 @@ fn adler32(data: &[u8]) -> u32 {
 
 impl AppManager {
     pub fn new_connected(app_id: AppId_t) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::connect(app_id, true)
+    }
+
+    /// Same connection as [`Self::new_connected`], but Steam client errors are printed.
+    pub fn new_connected_verbose(app_id: AppId_t) -> Result<Self, Box<dyn std::error::Error>> {
+        Self::connect(app_id, false)
+    }
+
+    fn connect(app_id: AppId_t, silent: bool) -> Result<Self, Box<dyn std::error::Error>> {
         unsafe {
             env::set_var("SteamAppId", app_id.to_string());
         }
-
-        #[cfg(feature = "cli")]
-        let silent = false;
-        #[cfg(not(feature = "cli"))]
-        let silent = true;
 
         let connected_steam = match ConnectedSteam::new(silent) {
             Ok(c) => c,

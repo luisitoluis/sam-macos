@@ -13,14 +13,16 @@ jobs:
       - name: Install Rust toolchain
         run: rustup update stable
 
-      - name: Build macOS GUI
+      - name: Build macOS GUI and CLI
         run: cargo build --release
 
       - name: Upload macOS artifact
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: macos-artifact
-          path: target/release/Sam
+          path: |
+            target/release/Sam
+            target/release/sam-cli
           retention-days: 1
 
   create_release:
@@ -43,6 +45,7 @@ jobs:
 
             This release includes:
             - macOS GUI
+            - sam-cli
             - Built on ${{ github.sha }}
 
           draft: true
@@ -50,3 +53,4 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           files: |
             release_artifacts/macos/Sam
+            release_artifacts/macos/sam-cli

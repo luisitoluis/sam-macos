@@ -13,42 +13,25 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg(all(feature = "gui", feature = "cli"))]
-compile_error!(
-    "Build the macOS GUI with `cargo build`, or the CLI with `cargo build --no-default-features --features cli`."
-);
-
-#[cfg(all(not(feature = "gui"), not(feature = "cli")))]
-compile_error!(
-    "Enable the `gui` feature for the macOS app, or build with `--no-default-features --features cli`."
-);
-
-#[cfg(all(feature = "gui", not(feature = "cli"), not(target_os = "macos")))]
-compile_error!(
-    "The GUI is macOS-only. On other systems build the CLI: cargo build --no-default-features --features cli"
-);
-
-mod backend;
-#[cfg(feature = "cli")]
-mod cli_frontend;
-#[cfg(all(feature = "gui", not(feature = "cli"), target_os = "macos"))]
-mod gui_frontend;
-mod steam_client;
-mod utils;
-
-#[cfg(feature = "cli")]
 fn main() -> std::process::ExitCode {
-    cli_frontend::main()
+    #[cfg(not(target_os = "macos"))]
+    {
+        eprintln!("The Sam window is macOS-only. Use sam-cli on this system.");
+        std::process::ExitCode::FAILURE
+    }
+
+    #[cfg(target_os = "macos")]
+    macos_main()
 }
 
-#[cfg(all(feature = "gui", not(feature = "cli"), target_os = "macos"))]
-fn main() -> std::process::ExitCode {
-    use crate::backend::app::app;
-    use crate::backend::orchestrator::orchestrator;
-    use crate::utils::arguments::parse_cli_arguments;
-    use crate::utils::bidir_child::BidirChild;
+#[cfg(target_os = "macos")]
+fn macos_main() -> std::process::ExitCode {
+    use sam::backend::app::app;
+    use sam::backend::orchestrator::orchestrator;
+    use sam::utils::app_paths::get_executable_path;
+    use sam::utils::arguments::parse_cli_arguments;
+    use sam::utils::bidir_child::BidirChild;
     use std::process::Command;
-    use utils::app_paths::get_executable_path;
 
     let arguments = parse_cli_arguments();
 
@@ -70,5 +53,5 @@ fn main() -> std::process::ExitCode {
     let orchestrator = BidirChild::new(Command::new(current_exe).arg("--orchestrator"))
         .expect("Failed to spawn orchestrator process");
 
-    std::process::ExitCode::from(gui_frontend::main_ui(orchestrator))
+    std::process::ExitCode::from(sam::gui_frontend::main_ui(orchestrator))
 }

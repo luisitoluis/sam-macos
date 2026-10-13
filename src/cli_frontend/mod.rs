@@ -21,7 +21,7 @@ use serde_json::json;
 
 #[derive(Parser)]
 #[clap(
-    name = "Sam",
+    name = "sam-cli",
     author,
     version,
     long_about = "Steam Achievements Manager Rewritten\nLicensed under GNU GPLv3, Copyright (C) 2026"
@@ -70,7 +70,7 @@ pub fn main() -> std::process::ExitCode {
 
     match cli.command {
         Command::ListAchievements { app_id } => {
-            let mut manager = match AppManager::new_connected(app_id) {
+            let mut manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);
@@ -95,7 +95,7 @@ pub fn main() -> std::process::ExitCode {
             };
         }
         Command::ListStatistics { app_id } => {
-            let mut manager = match AppManager::new_connected(app_id) {
+            let mut manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);
@@ -150,7 +150,7 @@ pub fn main() -> std::process::ExitCode {
         }
 
         Command::Unlock { app_id, ids } => {
-            let manager = match AppManager::new_connected(app_id) {
+            let manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);
@@ -194,7 +194,7 @@ pub fn main() -> std::process::ExitCode {
         }
 
         Command::UnlockAll { app_id } => {
-            let mut manager = match AppManager::new_connected(app_id) {
+            let mut manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);
@@ -215,7 +215,7 @@ pub fn main() -> std::process::ExitCode {
         }
 
         Command::Lock { app_id, ids } => {
-            let manager = match AppManager::new_connected(app_id) {
+            let manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);
@@ -259,7 +259,7 @@ pub fn main() -> std::process::ExitCode {
         }
 
         Command::LockAll { app_id } => {
-            let manager = match AppManager::new_connected(app_id) {
+            let manager = match AppManager::new_connected_verbose(app_id) {
                 Ok(manager) => manager,
                 Err(e) => {
                     eprintln!("Failed to connect to Steam: {}", e);

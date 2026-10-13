@@ -20,9 +20,13 @@ interprocess = "2"
 libloading = "0"
 
 [features]
-default = ["gui"]
+default = ["gui", "cli"]
 gui = ["dep:eframe"]
 cli = ["dep:clap"]
+
+[lib]
+name = "sam"
+path = "src/lib.rs"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0"
@@ -39,3 +43,9 @@ lto = "thin"
 [[bin]]
 name = "Sam"
 path = "src/main.rs"
+required-features = ["gui"]
+
+[[bin]]
+name = "sam-cli"
+path = "src/bin/sam-cli.rs"
+required-features = ["cli"]
