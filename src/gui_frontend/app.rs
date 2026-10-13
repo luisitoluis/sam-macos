@@ -15,6 +15,7 @@
 
 use crate::backend::app_lister::{AppModel, AppModelType};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
+use crate::gui_frontend::text::{self, Id, Language, Message};
 use crate::gui_frontend::request::{
     GetAchievements, GetStats, GetSubscribedAppList, LaunchApp, Request, ResetStats,
     SetAchievement, SetFloatStat, SetIntStat, Shutdown, StopApp, StoreStatsAndAchievements,
@@ -42,7 +43,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         "Sam",
         options,
         Box::new(move |cc| {
-            cc.egui_ctx.set_visuals(egui::Visuals::dark());
+            cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
             Ok(Box::new(SamApp::new(auto_open)))
         }),
     ) {
@@ -88,17 +89,17 @@ enum UiEvent {
         app_id: u32,
         achievements: Result<Vec<AchievementInfo>, String>,
         stats: Result<Vec<StatInfo>, String>,
-        message: Option<String>,
+        message: Option<Id>,
     },
     Achievements {
         app_id: u32,
         achievements: Result<Vec<AchievementInfo>, String>,
-        message: String,
+        message: Id,
     },
     Stats {
         app_id: u32,
         stats: Result<Vec<StatInfo>, String>,
-        message: String,
+        message: Id,
     },
     Closed,
     Notice(Result<String, String>),
@@ -134,7 +135,7 @@ struct GameView {
     app_id: u32,
     name: String,
     developer: String,
-    kind: String,
+    kind: AppModelType,
     tab: GameTab,
     loading: bool,
     achievements: Vec<AchievementInfo>,
@@ -154,9 +155,12 @@ struct SamApp {
     search: String,
     hide_junk: bool,
     game: Option<GameView>,
-    notice: Option<Result<String, String>>,
+    notice: Option<Result<Message, Message>>,
     confirm: Option<ConfirmAction>,
     auto_open: Option<u32>,
+    theme: egui::ThemePreference,
+    language: Language,
+    settings_open: bool,
 }
 
 impl SamApp {
@@ -176,9 +180,12 @@ impl SamApp {
             search: String::new(),
             hide_junk: true,
             game: None,
-            notice: Some(Ok("Loading your Steam library…".to_string())),
+            notice: Some(Ok(Message::Phrase(Id::LoadingLibrary))),
             confirm: None,
             auto_open,
+            theme: egui::ThemePreference::Dark,
+            language: Language::from_locale(),
+            settings_open: false,
         };
         app.send(Job::LoadApps);
         app
@@ -188,7 +195,7 @@ impl SamApp {
         self.inflight += 1;
         if self.jobs.send(job).is_err() {
             self.inflight = self.inflight.saturating_sub(1);
-            self.notice = Some(Err("Steam worker stopped.".to_string()));
+            self.notice = Some(Err(Message::Phrase(Id::WorkerStopped)));
         }
     }
 
@@ -209,12 +216,12 @@ impl SamApp {
                     apps.sort_by(|a, b| a.app_name.to_lowercase().cmp(&b.app_name.to_lowercase()));
                     let count = apps.len();
                     self.apps = apps;
-                    self.notice = Some(Ok(format!("{count} games")));
+                    self.notice = Some(Ok(Message::Games(count)));
                     if let Some(app_id) = self.auto_open.take() {
                         self.open_app(app_id);
                     }
                 }
-                Err(err) => self.notice = Some(Err(err)),
+                Err(err) => self.notice = Some(Err(Message::Own(err))),
             },
             UiEvent::Details {
                 app_id,
@@ -232,9 +239,9 @@ impl SamApp {
                     match achievements {
                         Ok(list) => {
                             game.achievements = list;
-                            self.notice = Some(Ok(message));
+                            self.notice = Some(Ok(Message::Phrase(message)));
                         }
-                        Err(err) => self.notice = Some(Err(err)),
+                        Err(err) => self.notice = Some(Err(Message::Own(err))),
                     }
                 }
             }
@@ -249,9 +256,9 @@ impl SamApp {
                         Ok(list) => {
                             game.stat_drafts = drafts_from(&list);
                             game.stats = list;
-                            self.notice = Some(Ok(message));
+                            self.notice = Some(Ok(Message::Phrase(message)));
                         }
-                        Err(err) => self.notice = Some(Err(err)),
+                        Err(err) => self.notice = Some(Err(Message::Own(err))),
                     }
                 }
             }
@@ -260,7 +267,10 @@ impl SamApp {
                 if let Some(game) = self.game.as_mut() {
                     game.loading = false;
                 }
-                self.notice = Some(notice);
+                self.notice = Some(match notice {
+                    Ok(text) => Ok(Message::Own(text)),
+                    Err(text) => Err(Message::Own(text)),
+                });
             }
         }
     }
@@ -270,7 +280,7 @@ impl SamApp {
         app_id: u32,
         achievements: Result<Vec<AchievementInfo>, String>,
         stats: Result<Vec<StatInfo>, String>,
-        message: Option<String>,
+        message: Option<Id>,
     ) {
         let Some(game) = self.game.as_mut().filter(|game| game.app_id == app_id) else {
             return;
@@ -288,10 +298,11 @@ impl SamApp {
             }
             Err(err) => error = Some(err),
         }
+        let loaded_name = game.name.clone();
         self.notice = Some(match (error, message) {
-            (Some(err), _) => Err(err),
-            (None, Some(message)) => Ok(message),
-            (None, None) => Ok(format!("Loaded {}", game.name)),
+            (Some(err), _) => Err(Message::Own(err)),
+            (None, Some(message)) => Ok(Message::Phrase(message)),
+            (None, None) => Ok(Message::Loaded(loaded_name)),
         });
     }
 
@@ -305,11 +316,9 @@ impl SamApp {
             app_id,
             name: app
                 .map(|app| app.app_name.clone())
-                .unwrap_or_else(|| format!("App {app_id}")),
+                .unwrap_or_else(|| format!("{} {app_id}", text::t(self.language, Id::AppWord))),
             developer: app.map(|app| app.developer.clone()).unwrap_or_default(),
-            kind: app
-                .map(|app| app.app_type.to_string())
-                .unwrap_or_else(|| "App".to_string()),
+            kind: app.map(|app| app.app_type).unwrap_or(AppModelType::App),
             tab: GameTab::Achievements,
             loading: true,
             achievements: Vec::new(),
@@ -383,14 +392,14 @@ impl SamApp {
             StatInfo::Integer(_) => match draft.trim().parse::<i32>() {
                 Ok(value) => StatValue::Int(value),
                 Err(_) => {
-                    self.notice = Some(Err(format!("'{draft}' is not an integer")));
+                    self.notice = Some(Err(Message::NotInteger(draft.trim().to_string())));
                     return;
                 }
             },
             StatInfo::Float(_) => match draft.trim().parse::<f32>() {
                 Ok(value) => StatValue::Float(value),
                 Err(_) => {
-                    self.notice = Some(Err(format!("'{draft}' is not a number")));
+                    self.notice = Some(Err(Message::NotNumber(draft.trim().to_string())));
                     return;
                 }
             },
@@ -410,23 +419,94 @@ impl SamApp {
             .arg(format!("steam://run/{app_id}"))
             .spawn()
         {
-            Ok(_) => self.notice = Some(Ok("Opening the game in Steam.".to_string())),
-            Err(err) => self.notice = Some(Err(format!("Could not open Steam: {err}"))),
+            Ok(_) => self.notice = Some(Ok(Message::Phrase(Id::OpeningGame))),
+            Err(err) => self.notice = Some(Err(Message::OpenFailed(err.to_string()))),
         }
+    }
+
+    fn library_header(&mut self, ui: &mut egui::Ui) {
+        let language = self.language;
+        ui.horizontal(|ui| {
+            ui.heading(text::t(language, Id::Library));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let button_size = egui::Vec2::splat(ui.spacing().interact_size.y);
+                if ui
+                    .add(
+                        egui::Button::new("⚙")
+                            .frame(false)
+                            .min_size(button_size),
+                    )
+                    .on_hover_text(text::t(language, Id::Settings))
+                    .clicked()
+                {
+                    self.settings_open = true;
+                }
+            });
+        });
+    }
+
+    fn settings_window(&mut self, ctx: &egui::Context) {
+        let mut open = self.settings_open;
+        let mut theme = self.theme;
+        let mut language = self.language;
+        egui::Window::new(text::t(language, Id::Settings))
+            .id(egui::Id::new("settings-window"))
+            .open(&mut open)
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.label(text::t(language, Id::Appearance));
+                ui.horizontal(|ui| {
+                    ui.selectable_value(
+                        &mut theme,
+                        egui::ThemePreference::System,
+                        text::t(language, Id::ThemeSystem),
+                    );
+                    ui.selectable_value(
+                        &mut theme,
+                        egui::ThemePreference::Dark,
+                        text::t(language, Id::ThemeDark),
+                    );
+                    ui.selectable_value(
+                        &mut theme,
+                        egui::ThemePreference::Light,
+                        text::t(language, Id::ThemeLight),
+                    );
+                });
+                ui.add_space(8.0);
+                ui.label(text::t(language, Id::Language));
+                egui::ComboBox::from_id_salt("settings-language")
+                    .selected_text(language.native_name())
+                    .show_ui(ui, |ui| {
+                        for option in Language::ALL {
+                            ui.selectable_value(&mut language, option, option.native_name());
+                        }
+                    });
+            });
+        if self.theme != theme {
+            self.theme = theme;
+            ctx.set_theme(theme);
+        }
+        self.language = language;
+        self.settings_open = open;
     }
 
     fn library_ui(&mut self, ui: &mut egui::Ui) -> Vec<UiAction> {
         let mut actions = Vec::new();
-        ui.heading("Library");
+        self.library_header(ui);
         ui.add_space(4.0);
         ui.add(
             egui::TextEdit::singleline(&mut self.search)
-                .hint_text("Search games")
+                .hint_text(text::t(self.language, Id::SearchGames))
                 .desired_width(f32::INFINITY),
         );
-        ui.checkbox(&mut self.hide_junk, "Hide junk");
+        ui.checkbox(&mut self.hide_junk, text::t(self.language, Id::HideJunk));
         if ui
-            .add_enabled(self.inflight == 0, egui::Button::new("Refresh"))
+            .add_enabled(
+                self.inflight == 0,
+                egui::Button::new(text::t(self.language, Id::Refresh)),
+            )
             .clicked()
         {
             actions.push(UiAction::RefreshApps);
@@ -452,22 +532,27 @@ impl SamApp {
             .map(|(index, _)| index)
             .collect();
 
-        ui.weak(format!("{} shown", visible.len()));
+        ui.weak(text::shown(self.language, visible.len()));
         if self.apps.is_empty() && self.inflight > 0 {
             ui.horizontal(|ui| {
                 ui.spinner();
-                ui.label("Loading your Steam library…");
+                ui.label(text::t(self.language, Id::LoadingLibrary));
             });
         }
 
         let selected = self.game.as_ref().map(|game| game.app_id);
         let idle = self.inflight == 0;
+        let footer_height = ui.spacing().interact_size.y + ui.spacing().item_spacing.y * 2.0;
+        let scroll_height = (ui.available_height() - footer_height).max(0.0);
         egui::ScrollArea::vertical()
             .id_salt("library-scroll")
+            .max_height(scroll_height)
+            .auto_shrink([false, false])
             .show(ui, |ui| {
                 for index in visible {
                     let app = &self.apps[index];
-                    let label = format!("{}\n{} · {}", app.app_name, app.app_id, app.app_type);
+                    let kind = text::t(self.language, kind_id(app.app_type));
+                    let label = format!("{}\n{} · {kind}", app.app_name, app.app_id);
                     if ui
                         .add_enabled(
                             idle,
@@ -490,11 +575,12 @@ impl SamApp {
         let Some(game) = self.game.as_mut() else {
             ui.vertical_centered(|ui| {
                 ui.add_space(96.0);
-                ui.label("Select a game to view achievements and stats.");
+                ui.label(text::t(self.language, Id::SelectGame));
             });
             return Vec::new();
         };
-        show_game(ui, game, busy)
+        let language = self.language;
+        show_game(ui, game, busy, language)
     }
 
     fn status_ui(&self, ui: &mut egui::Ui) {
@@ -504,13 +590,16 @@ impl SamApp {
             }
             match &self.notice {
                 Some(Ok(message)) => {
-                    ui.label(message);
+                    ui.label(message.text(self.language));
                 }
                 Some(Err(message)) => {
-                    ui.colored_label(egui::Color32::from_rgb(255, 140, 140), message);
+                    ui.colored_label(
+                        egui::Color32::from_rgb(255, 140, 140),
+                        message.text(self.language),
+                    );
                 }
                 None => {
-                    ui.label("Ready");
+                    ui.label(text::t(self.language, Id::Ready));
                 }
             }
         });
@@ -521,22 +610,22 @@ impl SamApp {
             return Vec::new();
         };
         let mut actions = Vec::new();
-        egui::Window::new("Confirm")
+        let language = self.language;
+        egui::Window::new(text::t(language, Id::Confirm))
+            .id(egui::Id::new("confirm-window"))
             .collapsible(false)
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 ui.label(match confirm {
-                    ConfirmAction::UnlockAll => {
-                        "Unlock every unprotected achievement in this game?"
-                    }
-                    ConfirmAction::Reset => "Reset stats and lock achievements for this game?",
+                    ConfirmAction::UnlockAll => text::t(language, Id::UnlockPrompt),
+                    ConfirmAction::Reset => text::t(language, Id::ResetPrompt),
                 });
                 ui.horizontal(|ui| {
-                    if ui.button("Cancel").clicked() {
+                    if ui.button(text::t(language, Id::Cancel)).clicked() {
                         self.confirm = None;
                     }
-                    if ui.button("Continue").clicked() {
+                    if ui.button(text::t(language, Id::Continue)).clicked() {
                         self.confirm = None;
                         actions.push(match confirm {
                             ConfirmAction::UnlockAll => UiAction::UnlockAll,
@@ -577,6 +666,7 @@ impl eframe::App for SamApp {
             .show(ui, |ui| actions.extend(self.library_ui(ui)));
         egui::CentralPanel::default().show(ui, |ui| actions.extend(self.game_ui(ui)));
         actions.extend(self.confirm_ui(ui.ctx()));
+        self.settings_window(ui.ctx());
 
         for action in actions {
             self.apply(action);
@@ -584,21 +674,26 @@ impl eframe::App for SamApp {
     }
 }
 
-fn show_game(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiAction> {
+fn show_game(
+    ui: &mut egui::Ui,
+    game: &mut GameView,
+    busy: bool,
+    language: Language,
+) -> Vec<UiAction> {
     let mut actions = Vec::new();
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(!busy, egui::Button::new("← Library"))
+            .add_enabled(!busy, egui::Button::new(text::t(language, Id::BackLibrary)))
             .clicked()
         {
             actions.push(UiAction::Close);
         }
         ui.heading(&game.name);
-        if ui.button("Launch").clicked() {
+        if ui.button(text::t(language, Id::Launch)).clicked() {
             actions.push(UiAction::Launch);
         }
         if ui
-            .add_enabled(!busy, egui::Button::new("Refresh"))
+            .add_enabled(!busy, egui::Button::new(text::t(language, Id::Refresh)))
             .clicked()
         {
             actions.push(UiAction::Reload);
@@ -606,30 +701,41 @@ fn show_game(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiAction
     });
     ui.weak(format!(
         "{} · {} · {}",
-        game.app_id, game.kind, game.developer
+        game.app_id,
+        text::t(language, kind_id(game.kind)),
+        game.developer
     ));
 
     if game.loading {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label("Talking to Steam…");
+            ui.label(text::t(language, Id::TalkingToSteam));
         });
     }
 
     ui.horizontal(|ui| {
-        ui.selectable_value(&mut game.tab, GameTab::Achievements, "Achievements");
-        ui.selectable_value(&mut game.tab, GameTab::Stats, "Stats");
+        ui.selectable_value(
+            &mut game.tab,
+            GameTab::Achievements,
+            text::t(language, Id::Achievements),
+        );
+        ui.selectable_value(&mut game.tab, GameTab::Stats, text::t(language, Id::Stats));
     });
     ui.separator();
 
     match game.tab {
-        GameTab::Achievements => actions.extend(show_achievements(ui, game, busy)),
-        GameTab::Stats => actions.extend(show_stats(ui, game, busy)),
+        GameTab::Achievements => actions.extend(show_achievements(ui, game, busy, language)),
+        GameTab::Stats => actions.extend(show_stats(ui, game, busy, language)),
     }
     actions
 }
 
-fn show_achievements(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiAction> {
+fn show_achievements(
+    ui: &mut egui::Ui,
+    game: &mut GameView,
+    busy: bool,
+    language: Language,
+) -> Vec<UiAction> {
     let mut actions = Vec::new();
     let unlocked = game
         .achievements
@@ -637,15 +743,25 @@ fn show_achievements(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<
         .filter(|achievement| achievement.is_achieved)
         .count();
     ui.horizontal(|ui| {
-        ui.label(format!("{unlocked}/{} unlocked", game.achievements.len()));
+        ui.label(text::unlocked(
+            language,
+            unlocked,
+            game.achievements.len(),
+        ));
         if ui
-            .add_enabled(!busy && !game.loading, egui::Button::new("Unlock all"))
+            .add_enabled(
+                !busy && !game.loading,
+                egui::Button::new(text::t(language, Id::UnlockAll)),
+            )
             .clicked()
         {
             actions.push(UiAction::AskUnlockAll);
         }
         if ui
-            .add_enabled(!busy && !game.loading, egui::Button::new("Reset all"))
+            .add_enabled(
+                !busy && !game.loading,
+                egui::Button::new(text::t(language, Id::ResetAll)),
+            )
             .clicked()
         {
             actions.push(UiAction::AskReset);
@@ -653,7 +769,7 @@ fn show_achievements(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<
     });
     ui.add(
         egui::TextEdit::singleline(&mut game.achievement_query)
-            .hint_text("Filter achievements")
+            .hint_text(text::t(language, Id::FilterAchievements))
             .desired_width(f32::INFINITY),
     );
 
@@ -699,10 +815,12 @@ fn show_achievements(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<
                         }
                         let mut meta = achievement.id.clone();
                         if protected {
-                            meta.push_str(" · protected");
+                            meta.push_str(" · ");
+                            meta.push_str(text::t(language, Id::Protected));
                         }
                         if let Some(percent) = achievement.global_achieved_percent {
-                            meta.push_str(&format!(" · {percent:.1}% of players"));
+                            meta.push_str(" · ");
+                            meta.push_str(&text::of_players(language, percent));
                         }
                         ui.weak(meta);
                     });
@@ -713,11 +831,16 @@ fn show_achievements(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<
     actions
 }
 
-fn show_stats(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiAction> {
+fn show_stats(
+    ui: &mut egui::Ui,
+    game: &mut GameView,
+    busy: bool,
+    language: Language,
+) -> Vec<UiAction> {
     let mut actions = Vec::new();
     ui.add(
         egui::TextEdit::singleline(&mut game.stat_query)
-            .hint_text("Filter stats")
+            .hint_text(text::t(language, Id::FilterStats))
             .desired_width(f32::INFINITY),
     );
 
@@ -755,10 +878,12 @@ fn show_stats(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiActio
                         });
                         let mut meta = stat_id.clone();
                         if protected {
-                            meta.push_str(" · protected");
+                            meta.push_str(" · ");
+                            meta.push_str(text::t(language, Id::Protected));
                         }
                         if increment_only {
-                            meta.push_str(" · increment only");
+                            meta.push_str(" · ");
+                            meta.push_str(text::t(language, Id::IncrementOnly));
                         }
                         ui.weak(meta);
                     });
@@ -767,7 +892,10 @@ fn show_stats(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiActio
                         egui::TextEdit::singleline(draft).desired_width(120.0),
                     );
                     if ui
-                        .add_enabled(!busy && !protected, egui::Button::new("Save"))
+                        .add_enabled(
+                            !busy && !protected,
+                            egui::Button::new(text::t(language, Id::Save)),
+                        )
                         .clicked()
                     {
                         actions.push(UiAction::SaveStat(stat_id));
@@ -777,6 +905,15 @@ fn show_stats(ui: &mut egui::Ui, game: &mut GameView, busy: bool) -> Vec<UiActio
             }
         });
     actions
+}
+
+fn kind_id(kind: AppModelType) -> Id {
+    match kind {
+        AppModelType::App => Id::KindApp,
+        AppModelType::Mod => Id::KindMod,
+        AppModelType::Demo => Id::KindDemo,
+        AppModelType::Junk => Id::KindJunk,
+    }
 }
 
 fn drafts_from(stats: &[StatInfo]) -> HashMap<String, String> {
@@ -827,7 +964,7 @@ fn steam_worker(jobs: Receiver<Job>, events: Sender<UiEvent>, shutdown_done: Sen
                     Ok(achievements) => UiEvent::Achievements {
                         app_id,
                         achievements: Ok(achievements),
-                        message: "Achievement updated.".to_string(),
+                        message: Id::AchievementUpdated,
                     },
                     Err(err) => UiEvent::Notice(Err(err.to_string())),
                 },
@@ -838,7 +975,7 @@ fn steam_worker(jobs: Receiver<Job>, events: Sender<UiEvent>, shutdown_done: Sen
                     Ok(achievements) => UiEvent::Achievements {
                         app_id,
                         achievements: Ok(achievements),
-                        message: "Achievements unlocked.".to_string(),
+                        message: Id::AchievementsUnlocked,
                     },
                     Err(err) => UiEvent::Notice(Err(err.to_string())),
                 },
@@ -850,7 +987,7 @@ fn steam_worker(jobs: Receiver<Job>, events: Sender<UiEvent>, shutdown_done: Sen
             }
             .request())
             {
-                Ok(_) => load_details(app_id, Some("Stats and achievements reset.".to_string())),
+                Ok(_) => load_details(app_id, Some(Id::StatsReset)),
                 Err(err) => UiEvent::Notice(Err(err.to_string())),
             },
             Job::SaveStat {
@@ -880,7 +1017,7 @@ fn open_app(app_id: u32, previous: Option<u32>) -> UiEvent {
     load_details(app_id, None)
 }
 
-fn load_details(app_id: u32, message: Option<String>) -> UiEvent {
+fn load_details(app_id: u32, message: Option<Id>) -> UiEvent {
     UiEvent::Details {
         app_id,
         achievements: GetAchievements { app_id }
@@ -918,7 +1055,7 @@ fn save_stat(app_id: u32, stat_id: String, value: StatValue) -> UiEvent {
         Ok(stats) => UiEvent::Stats {
             app_id,
             stats: Ok(stats),
-            message: "Stat saved.".to_string(),
+            message: Id::StatSaved,
         },
         Err(err) => UiEvent::Notice(Err(err.to_string())),
     }
