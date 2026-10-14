@@ -352,6 +352,15 @@ enum GameTab {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
+enum UpdateCheck {
+    Idle,
+    Checking,
+    Current,
+    Available,
+    Failed,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ConfirmAction {
     UnlockAll,
     Reset,
@@ -387,6 +396,9 @@ struct SamApp {
     theme: egui::ThemePreference,
     language: Language,
     settings_open: bool,
+    update_tx: Sender<UpdateCheck>,
+    update_rx: Receiver<UpdateCheck>,
+    update_check: UpdateCheck,
 }
 
 impl SamApp {
@@ -394,6 +406,7 @@ impl SamApp {
         let (job_tx, job_rx) = mpsc::channel();
         let (event_tx, event_rx) = mpsc::channel();
         let (shutdown_tx, shutdown_rx) = mpsc::channel();
+        let (update_tx, update_rx) = mpsc::channel();
         let worker = thread::spawn(move || steam_worker(job_rx, event_tx, shutdown_tx));
 
         let mut app = Self {
@@ -412,6 +425,9 @@ impl SamApp {
             theme: egui::ThemePreference::Dark,
             language: Language::from_locale(),
             settings_open: false,
+            update_tx,
+            update_rx,
+            update_check: UpdateCheck::Idle,
         };
         app.send(Job::LoadApps);
         app
@@ -430,7 +446,10 @@ impl SamApp {
             self.inflight = self.inflight.saturating_sub(1);
             self.handle(event);
         }
-        if self.inflight > 0 {
+        while let Ok(update) = self.update_rx.try_recv() {
+            self.update_check = update;
+        }
+        if self.inflight > 0 || self.update_check == UpdateCheck::Checking {
             ctx.request_repaint_after(Duration::from_millis(100));
         }
     }
@@ -671,6 +690,8 @@ impl SamApp {
         let mut open = self.settings_open;
         let mut theme = self.theme;
         let mut language = self.language;
+        let mut check_updates = false;
+        let update_status = self.update_label();
         egui::Window::new(text::t(language, Id::Settings))
             .id(egui::Id::new("settings-window"))
             .open(&mut open)
@@ -707,6 +728,13 @@ impl SamApp {
                             ui.selectable_value(&mut language, option, option.native_name());
                         }
                     });
+                ui.add_space(12.0);
+                ui.horizontal(|ui| {
+                    if ui.button(text::t(language, Id::CheckUpdates)).clicked() {
+                        check_updates = true;
+                    }
+                    ui.weak(update_status);
+                });
             });
         if self.theme != theme {
             self.theme = theme;
@@ -714,6 +742,31 @@ impl SamApp {
         }
         self.language = language;
         self.settings_open = open;
+        if check_updates {
+            self.check_for_update();
+        }
+    }
+
+    fn check_for_update(&mut self) {
+        if self.update_check == UpdateCheck::Checking {
+            return;
+        }
+        self.update_check = UpdateCheck::Checking;
+        let tx = self.update_tx.clone();
+        thread::spawn(move || {
+            let _ = tx.send(query_update());
+        });
+    }
+
+    fn update_label(&self) -> String {
+        let id = match self.update_check {
+            UpdateCheck::Idle => return env!("CARGO_PKG_VERSION").to_owned(),
+            UpdateCheck::Checking => Id::CheckingUpdates,
+            UpdateCheck::Current => Id::UpToDate,
+            UpdateCheck::Available => Id::UpdateAvailable,
+            UpdateCheck::Failed => Id::UpdateCheckFailed,
+        };
+        text::t(self.language, id).to_owned()
     }
 
     fn library_ui(&mut self, ui: &mut egui::Ui) -> Vec<UiAction> {
@@ -1365,6 +1418,39 @@ fn segment(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response {
             .frame(selected)
             .corner_radius(8),
     )
+}
+
+fn query_update() -> UpdateCheck {
+    let local = env!("SAM_GIT_COMMIT");
+    if local.is_empty() {
+        return UpdateCheck::Failed;
+    }
+    let output = Command::new("git")
+        .args([
+            "ls-remote",
+            "git@github.com:luisitoluis/sam-macos-rs.git",
+            "refs/heads/master",
+        ])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env(
+            "GIT_SSH_COMMAND",
+            "ssh -o BatchMode=yes -o ConnectTimeout=8",
+        )
+        .output();
+    match output {
+        Ok(output) if output.status.success() => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            let remote = text.split_whitespace().next().unwrap_or("");
+            if remote.is_empty() {
+                UpdateCheck::Failed
+            } else if remote == local {
+                UpdateCheck::Current
+            } else {
+                UpdateCheck::Available
+            }
+        }
+        _ => UpdateCheck::Failed,
+    }
 }
 
 fn kind_id(kind: AppModelType) -> Id {
