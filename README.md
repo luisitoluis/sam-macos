@@ -46,6 +46,12 @@ Installs the window, Rust, and Rosetta 2 when they are missing. The command is `
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
 ```
 
+Installs the terminal UI. The command is `sam-tui`.
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install-tui.sh)"
+```
+
 To build both the window and the terminal UI yourself:
 
 ```bash
