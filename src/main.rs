@@ -16,7 +16,7 @@
 fn main() -> std::process::ExitCode {
     #[cfg(not(target_os = "macos"))]
     {
-        eprintln!("The Sam window is macOS-only. Use Sam-tui on this system.");
+        eprintln!("The Sam window is macOS-only. Use sam-tui on this system.");
         std::process::ExitCode::FAILURE
     }
 

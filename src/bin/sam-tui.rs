@@ -14,5 +14,9 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 fn main() -> std::process::ExitCode {
+    if std::env::args().any(|arg| arg == "--version" || arg == "-V") {
+        println!("sam-tui {}", env!("CARGO_PKG_VERSION"));
+        return std::process::ExitCode::SUCCESS;
+    }
     sam::tui_frontend::main()
 }

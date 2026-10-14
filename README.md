@@ -40,20 +40,21 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 
 ## Installation
 
-### Option 1: Pre-built (if available)
-Download from the [Releases page](https://github.com/luisitoluis/sam-macos-rs/releases).
+Installs the window, Rust, and Rosetta 2 when they are missing. The command is `sam`.
 
-### Option 2: Build from source
 ```bash
-# Clone this repository
-git clone https://github.com/gentleman-programming/SteamAchievementManager.git
-cd SteamAchievementManager
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
+```
 
-# macOS GUI (Apple Silicon or Intel, for the host you're on):
+To build both the window and the terminal UI yourself:
+
+```bash
+git clone https://github.com/luisitoluis/sam-macos-rs.git
+cd sam-macos-rs
 cargo build --release
 ```
 
-`cargo build --release` produces both programs: `target/release/Sam` (the window) and `target/release/Sam-tui` (the same screens in the terminal).
+`cargo build --release` produces `target/release/Sam` (the window) and `target/release/sam-tui` (the same screens in the terminal). After building, `sam-tui` from any directory opens the terminal interface. `sam-tui --version` prints the version.
 
 ## How it works on macOS
 
