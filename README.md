@@ -52,15 +52,26 @@ Installs the terminal UI. The command is `sam-tui`.
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install-tui.sh)"
 ```
 
-To build both the window and the terminal UI yourself:
+To build them yourself:
 
 ```bash
 git clone https://github.com/luisitoluis/sam-macos-rs.git
 cd sam-macos-rs
-cargo build --release
 ```
 
-`cargo build --release` produces `target/release/Sam` (the window) and `target/release/sam-tui` (the same screens in the terminal). After building, `sam-tui` from any directory opens the terminal interface. `sam-tui --version` prints the version.
+GUI, written to `target/release/Sam`:
+
+```bash
+cargo build --bin Sam --no-default-features --features gui
+```
+
+TUI, written to `target/release/sam-tui`:
+
+```bash
+cargo build --bin sam-tui --no-default-features --features cli
+```
+
+After building, `sam-tui` from any directory opens the terminal interface. `sam-tui --version` prints the version.
 
 ## How it works on macOS
 
