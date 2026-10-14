@@ -14,10 +14,10 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod backend;
-#[cfg(feature = "cli")]
-pub mod tui_frontend;
 #[cfg(all(feature = "gui", target_os = "macos"))]
 pub mod gui_frontend;
 pub mod steam_client;
 pub mod text;
+#[cfg(feature = "cli")]
+pub mod tui_frontend;
 pub mod utils;

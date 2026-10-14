@@ -20,7 +20,7 @@ use crate::text::{self, Id, Language, Message};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::execute;
 use crossterm::terminal::{
-    disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
+    EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode,
 };
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
@@ -36,9 +36,115 @@ use std::time::Duration;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Theme {
-    System,
-    Dark,
-    Light,
+    Aura,
+    Ayu,
+    Carbonfox,
+    Catppuccin,
+    CatppuccinFrappe,
+    CatppuccinMacchiato,
+    Cobalt2,
+    Cursor,
+    Dracula,
+    Everforest,
+    Flexoki,
+    Github,
+    Gruvbox,
+    Kanagawa,
+    LucentOrng,
+    Material,
+    Matrix,
+    Mercury,
+    Monokai,
+    Nightowl,
+    Nord,
+    OneDark,
+    Opencode,
+    Orng,
+    OsakaJade,
+    Palenight,
+    Rosepine,
+    Solarized,
+    Synthwave84,
+    Tokyonight,
+    Vercel,
+    Vesper,
+    Zenburn,
+}
+
+impl Theme {
+    const ALL: [Theme; 33] = [
+        Theme::Aura,
+        Theme::Ayu,
+        Theme::Carbonfox,
+        Theme::Catppuccin,
+        Theme::CatppuccinFrappe,
+        Theme::CatppuccinMacchiato,
+        Theme::Cobalt2,
+        Theme::Cursor,
+        Theme::Dracula,
+        Theme::Everforest,
+        Theme::Flexoki,
+        Theme::Github,
+        Theme::Gruvbox,
+        Theme::Kanagawa,
+        Theme::LucentOrng,
+        Theme::Material,
+        Theme::Matrix,
+        Theme::Mercury,
+        Theme::Monokai,
+        Theme::Nightowl,
+        Theme::Nord,
+        Theme::OneDark,
+        Theme::Opencode,
+        Theme::Orng,
+        Theme::OsakaJade,
+        Theme::Palenight,
+        Theme::Rosepine,
+        Theme::Solarized,
+        Theme::Synthwave84,
+        Theme::Tokyonight,
+        Theme::Vercel,
+        Theme::Vesper,
+        Theme::Zenburn,
+    ];
+
+    fn name(self) -> &'static str {
+        match self {
+            Theme::Aura => "aura",
+            Theme::Ayu => "ayu",
+            Theme::Carbonfox => "carbonfox",
+            Theme::Catppuccin => "catppuccin",
+            Theme::CatppuccinFrappe => "catppuccin-frappe",
+            Theme::CatppuccinMacchiato => "catppuccin-macchiato",
+            Theme::Cobalt2 => "cobalt2",
+            Theme::Cursor => "cursor",
+            Theme::Dracula => "dracula",
+            Theme::Everforest => "everforest",
+            Theme::Flexoki => "flexoki",
+            Theme::Github => "github",
+            Theme::Gruvbox => "gruvbox",
+            Theme::Kanagawa => "kanagawa",
+            Theme::LucentOrng => "lucent-orng",
+            Theme::Material => "material",
+            Theme::Matrix => "matrix",
+            Theme::Mercury => "mercury",
+            Theme::Monokai => "monokai",
+            Theme::Nightowl => "nightowl",
+            Theme::Nord => "nord",
+            Theme::OneDark => "one-dark",
+            Theme::Opencode => "opencode",
+            Theme::Orng => "orng",
+            Theme::OsakaJade => "osaka-jade",
+            Theme::Palenight => "palenight",
+            Theme::Rosepine => "rosepine",
+            Theme::Solarized => "solarized",
+            Theme::Synthwave84 => "synthwave84",
+            Theme::Tokyonight => "tokyonight",
+            Theme::Vercel => "vercel",
+            Theme::Vesper => "vesper",
+            Theme::Zenburn => "zenburn",
+        }
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -103,6 +209,10 @@ struct App {
     notice: Option<Result<Message, Message>>,
     language: Language,
     theme: Theme,
+    appearance: bool,
+    theme_query: String,
+    theme_index: usize,
+    theme_saved: Theme,
     quit: bool,
 }
 
@@ -160,13 +270,20 @@ impl App {
             pane: Pane::Library,
             typing: None,
             settings: false,
-            settings_index: 1,
+            settings_index: 0,
             help: false,
             confirm: None,
             confirm_accept: false,
             notice: Some(Ok(Message::Phrase(Id::LoadingLibrary))),
             language: Language::from_locale(),
-            theme: Theme::Dark,
+            theme: Theme::Opencode,
+            appearance: false,
+            theme_query: String::new(),
+            theme_index: Theme::ALL
+                .iter()
+                .position(|theme| *theme == Theme::Opencode)
+                .unwrap_or(0),
+            theme_saved: Theme::Opencode,
             quit: false,
         }
     }
@@ -307,13 +424,15 @@ impl App {
             KeyCode::Char('s') => self.open_settings(),
             KeyCode::Char('h') if self.pane == Pane::Library => self.hide_junk = !self.hide_junk,
             KeyCode::Char('r') if self.inflight == 0 => self.refresh(),
-            KeyCode::Char('/') => self.typing = Some(match self.pane {
-                Pane::Library => Typing::Search,
-                Pane::Game => match self.game.as_ref().map(|game| game.tab) {
-                    Some(GameTab::Stats) => Typing::StatFilter,
-                    _ => Typing::AchievementFilter,
-                },
-            }),
+            KeyCode::Char('/') => {
+                self.typing = Some(match self.pane {
+                    Pane::Library => Typing::Search,
+                    Pane::Game => match self.game.as_ref().map(|game| game.tab) {
+                        Some(GameTab::Stats) => Typing::StatFilter,
+                        _ => Typing::AchievementFilter,
+                    },
+                })
+            }
             KeyCode::Up | KeyCode::Char('k') => self.move_selection(-1),
             KeyCode::Down | KeyCode::Char('j') => self.move_selection(1),
             KeyCode::PageUp => self.move_selection(-8),
@@ -380,16 +499,17 @@ impl App {
     }
 
     fn open_settings(&mut self) {
-        self.settings_index = match self.theme {
-            Theme::System => 0,
-            Theme::Dark => 1,
-            Theme::Light => 2,
-        };
+        self.settings_index = 0;
+        self.appearance = false;
         self.settings = true;
     }
 
     fn on_settings_key(&mut self, key: KeyEvent) {
-        let last = 3 + Language::ALL.len() - 1;
+        if self.appearance {
+            self.on_appearance_key(key);
+            return;
+        }
+        let last = Language::ALL.len();
         match key.code {
             KeyCode::Esc | KeyCode::Char('s') => self.settings = false,
             KeyCode::Char('q') => self.quit = true,
@@ -407,13 +527,89 @@ impl App {
     }
 
     fn apply_settings_row(&mut self) {
-        if self.settings_index < 3 {
-            self.theme = [Theme::System, Theme::Dark, Theme::Light][self.settings_index];
+        if self.settings_index == 0 {
+            self.open_appearance();
             return;
         }
-        let index = self.settings_index - 3;
+        let index = self.settings_index - 1;
         if let Some(language) = Language::ALL.get(index) {
             self.language = *language;
+        }
+    }
+
+    fn open_appearance(&mut self) {
+        self.theme_saved = self.theme;
+        self.theme_query.clear();
+        self.theme_index = Theme::ALL
+            .iter()
+            .position(|theme| *theme == self.theme)
+            .unwrap_or(0);
+        self.appearance = true;
+    }
+
+    fn on_appearance_key(&mut self, key: KeyEvent) {
+        match key.code {
+            KeyCode::Esc => {
+                self.theme = self.theme_saved;
+                self.appearance = false;
+            }
+            KeyCode::Enter => self.appearance = false,
+            KeyCode::Up => self.move_theme(-1),
+            KeyCode::Down => self.move_theme(1),
+            KeyCode::PageUp => self.move_theme(-10),
+            KeyCode::PageDown => self.move_theme(10),
+            KeyCode::Home => self.move_theme(isize::MIN),
+            KeyCode::End => self.move_theme(isize::MAX),
+            KeyCode::Backspace => {
+                self.theme_query.pop();
+                self.sync_theme_filter();
+            }
+            KeyCode::Char(ch) => {
+                self.theme_query.push(ch);
+                self.sync_theme_filter();
+            }
+            _ => {}
+        }
+    }
+
+    fn filtered_themes(&self) -> Vec<Theme> {
+        let query = self.theme_query.to_lowercase();
+        Theme::ALL
+            .into_iter()
+            .filter(|theme| query.is_empty() || theme.name().contains(&query))
+            .collect()
+    }
+
+    fn move_theme(&mut self, delta: isize) {
+        let themes = self.filtered_themes();
+        if themes.is_empty() {
+            return;
+        }
+        let len = themes.len() as isize;
+        let next = if delta == isize::MIN {
+            0
+        } else if delta == isize::MAX {
+            len - 1
+        } else {
+            (self.theme_index as isize + delta).rem_euclid(len)
+        } as usize;
+        self.theme_index = next;
+        self.theme = themes[next];
+    }
+
+    fn sync_theme_filter(&mut self) {
+        let themes = self.filtered_themes();
+        if self.theme_query.is_empty() {
+            self.theme = self.theme_saved;
+            self.theme_index = themes
+                .iter()
+                .position(|theme| *theme == self.theme_saved)
+                .unwrap_or(0);
+            return;
+        }
+        if let Some(theme) = themes.first().copied() {
+            self.theme_index = 0;
+            self.theme = theme;
         }
     }
 
@@ -436,16 +632,20 @@ impl App {
     fn buffer_mut(&mut self, typing: Typing) -> &mut String {
         match typing {
             Typing::Search => &mut self.search,
-            Typing::AchievementFilter => &mut self
-                .game
-                .as_mut()
-                .expect("achievement filter without a game")
-                .achievement_query,
-            Typing::StatFilter => &mut self
-                .game
-                .as_mut()
-                .expect("stat filter without a game")
-                .stat_query,
+            Typing::AchievementFilter => {
+                &mut self
+                    .game
+                    .as_mut()
+                    .expect("achievement filter without a game")
+                    .achievement_query
+            }
+            Typing::StatFilter => {
+                &mut self
+                    .game
+                    .as_mut()
+                    .expect("stat filter without a game")
+                    .stat_query
+            }
             Typing::StatValue => {
                 let game = self.game.as_mut().expect("stat edit without a game");
                 let id = visible_stats(game)
@@ -573,7 +773,10 @@ impl App {
         if game.tab != GameTab::Achievements || game.loading {
             return;
         }
-        let Some(index) = visible_achievements(game).get(game.achievement_index).copied() else {
+        let Some(index) = visible_achievements(game)
+            .get(game.achievement_index)
+            .copied()
+        else {
             return;
         };
         let achievement = &game.achievements[index];
@@ -665,6 +868,11 @@ impl App {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        let background = palette(self.theme).background;
+        frame.render_widget(
+            Block::default().style(Style::default().bg(background)),
+            area,
+        );
         let rows = Layout::vertical([Constraint::Min(1), Constraint::Length(3)]).split(area);
         let library_width = (area.width as u32 * 34 / 100).clamp(28, 42) as u16;
         let columns = Layout::horizontal([
@@ -679,7 +887,11 @@ impl App {
             self.draw_help(frame, area);
         }
         if self.settings {
-            self.draw_settings(frame, area);
+            if self.appearance {
+                self.draw_appearance(frame, area);
+            } else {
+                self.draw_settings(frame, area);
+            }
         }
         if self.confirm.is_some() {
             self.draw_confirm(frame, area);
@@ -760,6 +972,7 @@ impl App {
             state.select(Some(self.library_index));
             frame.render_stateful_widget(
                 List::new(items)
+                    .style(palette.fg)
                     .highlight_style(palette.selected)
                     .highlight_symbol(""),
                 parts[2],
@@ -784,7 +997,8 @@ impl App {
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let Some(game) = self.game.as_mut() else {
-            let body = Layout::vertical([Constraint::Percentage(35), Constraint::Min(1)]).split(inner);
+            let body =
+                Layout::vertical([Constraint::Percentage(35), Constraint::Min(1)]).split(inner);
             frame.render_widget(
                 Paragraph::new(text::t(self.language, Id::SelectGame))
                     .style(palette.dim)
@@ -822,7 +1036,7 @@ impl App {
                     palette.dim
                 },
             ),
-            Span::raw("  "),
+            Span::styled("  ", palette.fg),
             Span::styled(
                 format!(" {stats_label} "),
                 if tab == GameTab::Stats {
@@ -893,6 +1107,7 @@ impl App {
                 }
                 frame.render_stateful_widget(
                     List::new(items)
+                        .style(palette.fg)
                         .highlight_style(palette.selected)
                         .highlight_symbol(""),
                     parts[3],
@@ -956,6 +1171,7 @@ impl App {
                 }
                 frame.render_stateful_widget(
                     List::new(items)
+                        .style(palette.fg)
                         .highlight_style(palette.selected)
                         .highlight_symbol(""),
                     parts[3],
@@ -979,7 +1195,8 @@ impl App {
         let palette = palette(self.theme);
         let block = Block::default()
             .borders(Borders::TOP)
-            .border_style(palette.border);
+            .border_style(palette.border)
+            .style(palette.fg);
         let inner = block.inner(area);
         frame.render_widget(block, area);
         let rows = Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).split(inner);
@@ -1006,6 +1223,12 @@ impl App {
         let commands: Vec<(&str, String)> = if self.confirm.is_some() {
             vec![
                 ("←→", String::new()),
+                ("enter", String::new()),
+                ("esc", text::t(language, Id::Cancel).to_string()),
+            ]
+        } else if self.appearance {
+            vec![
+                ("↑↓", String::new()),
                 ("enter", String::new()),
                 ("esc", text::t(language, Id::Cancel).to_string()),
             ]
@@ -1058,7 +1281,7 @@ impl App {
         let mut spans = Vec::new();
         for (index, (key, label)) in commands.iter().enumerate() {
             if index > 0 {
-                spans.push(Span::raw("  "));
+                spans.push(Span::styled("  ", palette.fg));
             }
             spans.push(Span::styled(
                 (*key).to_string(),
@@ -1073,47 +1296,83 @@ impl App {
 
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
         let palette = palette(self.theme);
-        let popup = centered(area, 46, 18);
+        let popup = centered(area, 46, 16);
         frame.render_widget(Clear, popup);
         let block = bordered(text::t(self.language, Id::Settings), true, &palette);
         let inner = block.inner(popup);
         frame.render_widget(block, popup);
 
-        let themes = [
-            (Theme::System, Id::ThemeSystem),
-            (Theme::Dark, Id::ThemeDark),
-            (Theme::Light, Id::ThemeLight),
-        ];
-        let mut lines = vec![Line::from(text::t(self.language, Id::Appearance)).style(palette.dim)];
-        for (index, (theme, id)) in themes.iter().enumerate() {
-            lines.push(settings_row(
-                self.settings_index == index,
-                self.theme == *theme,
-                text::t(self.language, *id),
+        let mut lines = vec![
+            menu_row(
+                self.settings_index == 0,
+                text::t(self.language, Id::Appearance),
+                self.theme.name(),
                 &palette,
-            ));
-        }
-        lines.push(Line::from(""));
-        lines.push(Line::from(text::t(self.language, Id::Language)).style(palette.dim));
+            ),
+            Line::from(""),
+            Line::from(text::t(self.language, Id::Language)).style(palette.dim),
+        ];
         for (index, language) in Language::ALL.iter().enumerate() {
-            let row = index + 3;
             lines.push(settings_row(
-                self.settings_index == row,
+                self.settings_index == index + 1,
                 self.language == *language,
                 language.native_name(),
                 &palette,
             ));
         }
 
-        let cursor = if self.settings_index < 3 {
-            self.settings_index + 1
+        let cursor = if self.settings_index == 0 {
+            0
         } else {
-            self.settings_index + 3
+            self.settings_index + 2
         };
         let height = inner.height as usize;
         let offset = cursor.saturating_sub(height.saturating_sub(1));
         let visible: Vec<Line> = lines.into_iter().skip(offset).collect();
         frame.render_widget(Paragraph::new(visible), inner);
+    }
+
+    fn draw_appearance(&self, frame: &mut Frame, area: Rect) {
+        let palette = palette(self.theme);
+        let popup = centered(area, 42, 20);
+        frame.render_widget(Clear, popup);
+        let block = bordered(text::t(self.language, Id::Appearance), true, &palette);
+        let inner = block.inner(popup);
+        frame.render_widget(block, popup);
+        let parts = Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).split(inner);
+        let search = if self.theme_query.is_empty() {
+            Line::from(vec![
+                Span::styled("/ ", palette.dim),
+                Span::styled(text::t(self.language, Id::Search), palette.dim),
+                Span::styled("▍", palette.focus),
+            ])
+        } else {
+            Line::from(Span::styled(format!("/ {}▍", self.theme_query), palette.fg))
+        };
+        frame.render_widget(Paragraph::new(search), parts[0]);
+
+        let themes = self.filtered_themes();
+        let height = parts[1].height as usize;
+        let offset = self.theme_index.saturating_sub(height.saturating_sub(1));
+        let lines: Vec<Line> = themes
+            .iter()
+            .enumerate()
+            .skip(offset)
+            .take(height)
+            .map(|(index, theme)| {
+                let active = index == self.theme_index;
+                let current = *theme == self.theme_saved;
+                let style = if active {
+                    palette.focus.add_modifier(Modifier::BOLD)
+                } else if current {
+                    palette.focus
+                } else {
+                    palette.fg
+                };
+                Line::from(format!(" ● {}", theme.name())).style(style)
+            })
+            .collect();
+        frame.render_widget(Paragraph::new(lines), parts[1]);
     }
 
     fn draw_help(&self, frame: &mut Frame, area: Rect) {
@@ -1144,7 +1403,10 @@ impl App {
             help_row("enter", text::t(language, Id::Save), &palette),
         ];
         let height = inner.height as usize;
-        frame.render_widget(Paragraph::new(lines.into_iter().take(height).collect::<Vec<_>>()), inner);
+        frame.render_widget(
+            Paragraph::new(lines.into_iter().take(height).collect::<Vec<_>>()),
+            inner,
+        );
     }
 
     fn draw_confirm(&self, frame: &mut Frame, area: Rect) {
@@ -1179,11 +1441,7 @@ impl App {
             &palette,
         );
         frame.render_widget(
-            Paragraph::new(Line::from(vec![
-                cancel,
-                Span::raw("   "),
-                continue_label,
-            ])),
+            Paragraph::new(Line::from(vec![cancel, Span::raw("   "), continue_label])),
             parts[1],
         );
     }
@@ -1196,47 +1454,182 @@ struct Palette {
     selected: Style,
     border: Style,
     focus: Style,
+    background: Color,
 }
 
 fn palette(theme: Theme) -> Palette {
-    let (fg, dim, border, selected_bg, selected_fg) = match theme {
-        Theme::Light => (
-            Color::Black,
-            Color::Rgb(90, 90, 90),
-            Color::Rgb(180, 180, 180),
-            Color::Rgb(224, 164, 52),
-            Color::Black,
+    let (text, muted, error, primary, background, border) = match theme {
+        Theme::Aura => c(
+            237, 236, 238, 109, 109, 109, 255, 103, 103, 162, 119, 255, 15, 15, 15, 45, 45, 45,
         ),
-        Theme::Dark => (
-            Color::White,
-            Color::Rgb(160, 160, 160),
-            Color::Rgb(70, 70, 70),
-            Color::Rgb(224, 164, 52),
-            Color::Black,
+        Theme::Ayu => c(
+            191, 189, 182, 86, 91, 102, 217, 87, 87, 89, 194, 255, 11, 14, 20, 108, 115, 128,
         ),
-        Theme::System => (
-            Color::Reset,
-            Color::DarkGray,
-            Color::DarkGray,
-            Color::Rgb(224, 164, 52),
-            Color::Black,
+        Theme::Carbonfox => c(
+            242, 244, 248, 125, 132, 143, 238, 83, 150, 51, 177, 255, 22, 22, 22, 48, 48, 48,
+        ),
+        Theme::Catppuccin => c(
+            205, 214, 244, 147, 153, 178, 243, 139, 168, 137, 180, 250, 30, 30, 46, 49, 50, 68,
+        ),
+        Theme::CatppuccinFrappe => c(
+            198, 208, 245, 148, 156, 184, 231, 130, 132, 141, 164, 226, 48, 52, 70, 65, 69, 89,
+        ),
+        Theme::CatppuccinMacchiato => c(
+            202, 211, 245, 147, 154, 183, 237, 135, 150, 138, 173, 244, 36, 39, 58, 54, 58, 79,
+        ),
+        Theme::Cobalt2 => c(
+            255, 255, 255, 173, 183, 201, 255, 0, 136, 0, 136, 255, 25, 53, 73, 31, 70, 98,
+        ),
+        Theme::Cursor => c(
+            228, 228, 228, 228, 228, 228, 227, 70, 113, 136, 192, 208, 24, 24, 24, 228, 228, 228,
+        ),
+        Theme::Dracula => c(
+            248, 248, 242, 98, 114, 164, 255, 85, 85, 189, 147, 249, 40, 42, 54, 68, 71, 90,
+        ),
+        Theme::Everforest => c(
+            211, 198, 170, 122, 132, 120, 230, 126, 128, 167, 192, 128, 45, 53, 59, 133, 146, 137,
+        ),
+        Theme::Flexoki => c(
+            206, 205, 195, 111, 110, 105, 209, 77, 65, 218, 112, 44, 16, 15, 15, 87, 86, 83,
+        ),
+        Theme::Github => c(
+            201, 209, 217, 139, 148, 158, 248, 81, 73, 88, 166, 255, 13, 17, 23, 48, 54, 61,
+        ),
+        Theme::Gruvbox => c(
+            235, 219, 178, 146, 131, 116, 251, 73, 52, 131, 165, 152, 40, 40, 40, 102, 92, 84,
+        ),
+        Theme::Kanagawa => c(
+            220, 215, 186, 114, 113, 105, 232, 36, 36, 126, 156, 216, 31, 31, 40, 84, 84, 109,
+        ),
+        Theme::LucentOrng => c(
+            238, 238, 238, 128, 128, 128, 224, 108, 117, 236, 91, 43, 42, 26, 21, 236, 91, 43,
+        ),
+        Theme::Material => c(
+            238, 255, 255, 84, 110, 122, 240, 113, 120, 130, 170, 255, 38, 50, 56, 55, 71, 79,
+        ),
+        Theme::Matrix => c(
+            98, 255, 148, 140, 163, 145, 255, 75, 75, 46, 255, 106, 10, 14, 10, 30, 42, 27,
+        ),
+        Theme::Mercury => c(
+            221, 221, 229, 157, 157, 168, 252, 146, 180, 141, 164, 245, 23, 23, 33, 180, 183, 200,
+        ),
+        Theme::Monokai => c(
+            248, 248, 242, 117, 113, 94, 249, 38, 114, 102, 217, 239, 39, 40, 34, 62, 61, 50,
+        ),
+        Theme::Nightowl => c(
+            214, 222, 235, 95, 126, 151, 239, 83, 80, 130, 170, 255, 1, 22, 39, 95, 126, 151,
+        ),
+        Theme::Nord => c(
+            236, 239, 244, 139, 149, 167, 191, 97, 106, 136, 192, 208, 46, 52, 64, 67, 76, 94,
+        ),
+        Theme::OneDark => c(
+            171, 178, 191, 92, 99, 112, 224, 108, 117, 97, 175, 239, 40, 44, 52, 57, 63, 74,
+        ),
+        Theme::Opencode => c(
+            238, 238, 238, 128, 128, 128, 224, 108, 117, 250, 178, 131, 10, 10, 10, 72, 72, 72,
+        ),
+        Theme::Orng => c(
+            238, 238, 238, 128, 128, 128, 224, 108, 117, 236, 91, 43, 10, 10, 10, 236, 91, 43,
+        ),
+        Theme::OsakaJade => c(
+            193, 196, 151, 83, 104, 91, 255, 83, 69, 45, 213, 183, 17, 28, 24, 61, 74, 68,
+        ),
+        Theme::Palenight => c(
+            166, 172, 205, 103, 110, 149, 240, 113, 120, 130, 170, 255, 41, 45, 62, 50, 54, 74,
+        ),
+        Theme::Rosepine => c(
+            224, 222, 244, 110, 106, 134, 235, 111, 146, 156, 207, 216, 25, 23, 36, 64, 61, 82,
+        ),
+        Theme::Solarized => c(
+            131, 148, 150, 88, 110, 117, 220, 50, 47, 38, 139, 210, 0, 43, 54, 7, 54, 66,
+        ),
+        Theme::Synthwave84 => c(
+            255, 255, 255, 132, 139, 189, 254, 68, 80, 54, 249, 246, 38, 35, 53, 73, 84, 149,
+        ),
+        Theme::Tokyonight => c(
+            200, 211, 245, 130, 139, 184, 255, 117, 127, 130, 170, 255, 26, 27, 38, 115, 122, 162,
+        ),
+        Theme::Vercel => c(
+            237, 237, 237, 135, 135, 135, 229, 72, 77, 0, 112, 243, 0, 0, 0, 31, 31, 31,
+        ),
+        Theme::Vesper => c(
+            255, 255, 255, 160, 160, 160, 255, 128, 128, 255, 199, 153, 16, 16, 16, 40, 40, 40,
+        ),
+        Theme::Zenburn => c(
+            220, 220, 204, 159, 159, 159, 204, 147, 147, 140, 208, 211, 63, 63, 63, 95, 95, 95,
         ),
     };
+    let background = Color::Rgb(background.0, background.1, background.2);
+    let primary = Color::Rgb(primary.0, primary.1, primary.2);
     Palette {
-        fg: Style::default().fg(fg),
-        dim: Style::default().fg(dim),
-        error: Style::default().fg(Color::Rgb(255, 140, 140)),
+        fg: Style::default()
+            .fg(Color::Rgb(text.0, text.1, text.2))
+            .bg(background),
+        dim: Style::default()
+            .fg(Color::Rgb(muted.0, muted.1, muted.2))
+            .bg(background),
+        error: Style::default()
+            .fg(Color::Rgb(error.0, error.1, error.2))
+            .bg(background),
         selected: Style::default()
-            .fg(selected_fg)
-            .bg(selected_bg)
+            .fg(background)
+            .bg(primary)
             .add_modifier(Modifier::BOLD),
-        border: Style::default().fg(border),
-        focus: Style::default().fg(Color::Rgb(224, 164, 52)),
+        border: Style::default()
+            .fg(Color::Rgb(border.0, border.1, border.2))
+            .bg(background),
+        focus: Style::default().fg(primary).bg(background),
+        background,
     }
 }
 
+fn c(
+    tr: u8,
+    tg: u8,
+    tb: u8,
+    mr: u8,
+    mg: u8,
+    mb: u8,
+    er: u8,
+    eg: u8,
+    eb: u8,
+    pr: u8,
+    pg: u8,
+    pb: u8,
+    br: u8,
+    bg: u8,
+    bb: u8,
+    xr: u8,
+    xg: u8,
+    xb: u8,
+) -> (
+    (u8, u8, u8),
+    (u8, u8, u8),
+    (u8, u8, u8),
+    (u8, u8, u8),
+    (u8, u8, u8),
+    (u8, u8, u8),
+) {
+    (
+        (tr, tg, tb),
+        (mr, mg, mb),
+        (er, eg, eb),
+        (pr, pg, pb),
+        (br, bg, bb),
+        (xr, xg, xb),
+    )
+}
+
 fn library_block(title: &str, focused: bool, palette: &Palette) -> Block<'static> {
-    bordered(title, focused, palette).title(Line::from(" ⚙").right_aligned())
+    Block::default()
+        .borders(Borders::ALL)
+        .title(Line::from(format!(" {title} ")).centered())
+        .border_style(if focused {
+            palette.focus
+        } else {
+            palette.border
+        })
+        .style(palette.fg)
 }
 
 fn settings_row(cursor: bool, selected: bool, label: &str, palette: &Palette) -> Line<'static> {
@@ -1246,12 +1639,23 @@ fn settings_row(cursor: bool, selected: bool, label: &str, palette: &Palette) ->
     Line::from(format!("{pointer} {mark} {label}")).style(style)
 }
 
+fn menu_row(cursor: bool, label: &str, value: &str, palette: &Palette) -> Line<'static> {
+    let pointer = if cursor { ">" } else { " " };
+    let style = if cursor { palette.selected } else { palette.fg };
+    Line::from(format!("{pointer} {label}   {value}")).style(style)
+}
+
 fn bordered(title: &str, focused: bool, palette: &Palette) -> Block<'static> {
     let title = title.to_string();
     Block::default()
         .borders(Borders::ALL)
         .title(title)
-        .border_style(if focused { palette.focus } else { palette.border })
+        .border_style(if focused {
+            palette.focus
+        } else {
+            palette.border
+        })
+        .style(palette.fg)
 }
 
 fn query_line(placeholder: &str, value: &str, editing: bool, palette: &Palette) -> Line<'static> {

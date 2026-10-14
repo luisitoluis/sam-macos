@@ -109,7 +109,9 @@ fn load_details(app_id: u32, message: Option<Id>) -> UiEvent {
     };
     UiEvent::Details {
         app_id,
-        achievements: manager.get_achievements(true).map_err(|err| err.to_string()),
+        achievements: manager
+            .get_achievements(true)
+            .map_err(|err| err.to_string()),
         stats: manager.get_statistics().map_err(|err| err.to_string()),
         message,
     }

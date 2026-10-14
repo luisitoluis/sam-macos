@@ -15,12 +15,12 @@
 
 use crate::backend::app_lister::{AppModel, AppModelType};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
-use crate::text::{self, Id, Language, Message};
 use crate::gui_frontend::request::{
     GetAchievements, GetStats, GetSubscribedAppList, LaunchApp, Request, ResetStats,
     SetAchievement, SetFloatStat, SetIntStat, Shutdown, StopApp, StoreStatsAndAchievements,
     UnlockAllAchievements,
 };
+use crate::text::{self, Id, Language, Message};
 use eframe::egui;
 use std::collections::HashMap;
 use std::process::Command;
@@ -517,11 +517,7 @@ impl SamApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let button_size = egui::Vec2::splat(ui.spacing().interact_size.y);
                 if ui
-                    .add(
-                        egui::Button::new("⚙")
-                            .frame(false)
-                            .min_size(button_size),
-                    )
+                    .add(egui::Button::new("⚙").frame(false).min_size(button_size))
                     .on_hover_text(text::t(language, Id::Settings))
                     .clicked()
                 {
@@ -829,11 +825,7 @@ fn show_achievements(
         .filter(|achievement| achievement.is_achieved)
         .count();
     ui.horizontal(|ui| {
-        ui.label(text::unlocked(
-            language,
-            unlocked,
-            game.achievements.len(),
-        ));
+        ui.label(text::unlocked(language, unlocked, game.achievements.len()));
         if ui
             .add_enabled(
                 !busy && !game.loading,
@@ -1161,27 +1153,24 @@ mod tests {
             .cloned()
             .unwrap_or_default();
         let mut fonts = egui::text::Fonts::new(egui::epaint::TextOptions::default(), definitions);
+        let mut fonts = fonts.with_pixels_per_point(1.0);
         let font_id = egui::FontId::proportional(16.0);
+        let missing = fonts.layout_no_wrap("◻".to_owned(), font_id.clone(), egui::Color32::WHITE);
+        let missing_uv = missing.rows[0].row.glyphs[0].uv_rect;
         for sample in ["简体中文", "日本語", "한국어"] {
-            let galley = fonts.layout_no_wrap(sample.to_owned(), font_id.clone(), egui::Color32::WHITE);
-            let replacement = fonts.layout_no_wrap(
-                "◻".repeat(sample.chars().count()),
-                font_id.clone(),
-                egui::Color32::WHITE,
-            );
-            assert_ne!(
-                galley.rect.width(),
-                replacement.rect.width(),
-                "{sample} laid out as the missing-glyph box; family {family:?}"
-            );
-            assert!(
-                galley
-                    .rows
-                    .iter()
-                    .flat_map(|row| row.row.glyphs.iter())
-                    .all(|glyph| glyph.uv_rect.size.x > 0.0 && glyph.uv_rect.size.y > 0.0),
-                "{sample} has an empty glyph; family {family:?}"
-            );
+            let galley =
+                fonts.layout_no_wrap(sample.to_owned(), font_id.clone(), egui::Color32::WHITE);
+            for glyph in galley.rows.iter().flat_map(|row| row.row.glyphs.iter()) {
+                assert!(
+                    glyph.uv_rect.size.x > 0.0 && glyph.uv_rect.size.y > 0.0,
+                    "{sample} has an empty glyph; family {family:?}"
+                );
+                assert_ne!(
+                    glyph.uv_rect, missing_uv,
+                    "{} in {sample} used the missing-glyph box; family {family:?}",
+                    glyph.chr
+                );
+            }
         }
     }
 }
