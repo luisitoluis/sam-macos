@@ -16,10 +16,7 @@
 use crate::dev_println;
 use interprocess::unnamed_pipe::{Recver, Sender};
 use std::env;
-#[cfg(unix)]
 use std::os::fd::FromRawFd;
-#[cfg(windows)]
-use std::os::windows::io::{FromRawHandle, RawHandle};
 use std::process::exit;
 
 #[derive(Debug)]
@@ -71,33 +68,15 @@ pub fn parse_cli_arguments() -> CliArguments {
                     continue;
                 }
 
-                #[cfg(unix)]
                 if key == "--tx" {
                     let raw_handle = value.parse::<i32>().expect("Invalid value for --tx");
                     args.tx = Some(Sender::from_raw_fd(raw_handle));
                     continue;
                 }
 
-                #[cfg(target_os = "windows")]
-                if key == "--tx" {
-                    let raw_handle =
-                        value.parse::<usize>().expect("Invalid value for --tx") as RawHandle;
-                    args.tx = Some(Sender::from_raw_handle(raw_handle));
-                    continue;
-                }
-
-                #[cfg(unix)]
                 if key == "--rx" {
                     let raw_handle = value.parse::<i32>().expect("Invalid value for --rx");
                     args.rx = Some(Recver::from_raw_fd(raw_handle));
-                    continue;
-                }
-
-                #[cfg(target_os = "windows")]
-                if key == "--rx" {
-                    let raw_handle =
-                        value.parse::<usize>().expect("Invalid value for --rx") as RawHandle;
-                    args.rx = Some(Recver::from_raw_handle(raw_handle));
                     continue;
                 }
             },

@@ -29,12 +29,6 @@ cli = ["dep:ratatui", "dep:crossterm"]
 name = "sam"
 path = "src/lib.rs"
 
-[target.'cfg(windows)'.dependencies]
-winreg = "0"
-
-[target.'cfg(windows)'.build-dependencies]
-winres = "0"
-
 [target.'cfg(target_os = "macos")'.dependencies]
 libc = "0"
 
@@ -47,6 +41,6 @@ path = "src/main.rs"
 required-features = ["gui"]
 
 [[bin]]
-name = "sam-cli"
-path = "src/bin/sam-cli.rs"
+name = "Sam-tui"
+path = "src/bin/sam-tui.rs"
 required-features = ["cli"]

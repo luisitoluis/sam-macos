@@ -25,35 +25,6 @@ pub fn get_executable_path() -> PathBuf {
 
 /// This function returns a valid directory where app data can be stored for a longer period of time.
 #[inline]
-#[cfg(target_os = "linux")]
-pub fn get_app_cache_dir() -> String {
-    use std::fs;
-    if let Ok(snap_name) = env::var("SNAP_NAME") {
-        if snap_name == "samrewritten" {
-            return env::var("SNAP_USER_COMMON").unwrap_or(String::from("/tmp"));
-        }
-
-        // Most likely a dev config
-        return ".".to_owned();
-    }
-
-    // Non-snap release
-    let folder = env::var("HOME").unwrap_or("/tmp".to_owned()) + "/.cache/samrewritten";
-    fs::create_dir_all(&folder).expect("Could not create temp folder");
-    folder
-}
-
-#[inline]
-#[cfg(target_os = "windows")]
-pub fn get_app_cache_dir() -> String {
-    std::env::temp_dir()
-        .to_str()
-        .expect("Failed to convert temp dir to string")
-        .to_owned()
-}
-
-/// macOS version - use standard cache directory
-#[inline]
 #[cfg(target_os = "macos")]
 pub fn get_app_cache_dir() -> String {
     use std::fs;

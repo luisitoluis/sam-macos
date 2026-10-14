@@ -15,7 +15,7 @@
 
 pub mod backend;
 #[cfg(feature = "cli")]
-pub mod cli_frontend;
+pub mod tui_frontend;
 #[cfg(all(feature = "gui", target_os = "macos"))]
 pub mod gui_frontend;
 pub mod steam_client;

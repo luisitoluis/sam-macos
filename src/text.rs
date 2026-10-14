@@ -135,6 +135,8 @@ pub enum Id {
     KindMod,
     KindDemo,
     KindJunk,
+    Help,
+    Quit,
 }
 
 pub fn t(lang: Language, id: Id) -> &'static str {
@@ -242,6 +244,8 @@ fn english(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "Demo",
         Id::KindJunk => "Junk",
+        Id::Help => "Help",
+        Id::Quit => "Quit",
     }
 }
 
@@ -296,6 +300,8 @@ fn spanish(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "Demo",
         Id::KindJunk => "Basura",
+        Id::Help => "Ayuda",
+        Id::Quit => "Salir",
     }
 }
 
@@ -350,6 +356,8 @@ fn chinese(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "试玩",
         Id::KindJunk => "无关",
+        Id::Help => "帮助",
+        Id::Quit => "退出",
     }
 }
 
@@ -404,6 +412,8 @@ fn russian(id: Id) -> &'static str {
         Id::KindMod => "Мод",
         Id::KindDemo => "Демо",
         Id::KindJunk => "Лишнее",
+        Id::Help => "Справка",
+        Id::Quit => "Выход",
     }
 }
 
@@ -458,6 +468,8 @@ fn portuguese(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "Demo",
         Id::KindJunk => "Lixo",
+        Id::Help => "Ajuda",
+        Id::Quit => "Sair",
     }
 }
 
@@ -512,6 +524,8 @@ fn german(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "Demo",
         Id::KindJunk => "Ausschuss",
+        Id::Help => "Hilfe",
+        Id::Quit => "Beenden",
     }
 }
 
@@ -566,6 +580,8 @@ fn french(id: Id) -> &'static str {
         Id::KindMod => "Mod",
         Id::KindDemo => "Démo",
         Id::KindJunk => "Superflu",
+        Id::Help => "Aide",
+        Id::Quit => "Quitter",
     }
 }
 
@@ -620,6 +636,8 @@ fn japanese(id: Id) -> &'static str {
         Id::KindMod => "MOD",
         Id::KindDemo => "デモ",
         Id::KindJunk => "不要",
+        Id::Help => "ヘルプ",
+        Id::Quit => "終了",
     }
 }
 
@@ -674,5 +692,7 @@ fn korean(id: Id) -> &'static str {
         Id::KindMod => "모드",
         Id::KindDemo => "데모",
         Id::KindJunk => "불필요",
+        Id::Help => "도움말",
+        Id::Quit => "종료",
     }
 }

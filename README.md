@@ -53,7 +53,7 @@ cd SteamAchievementManager
 cargo build --release
 ```
 
-`cargo build --release` produces both programs: `target/release/Sam` (the window) and `target/release/sam-cli` (the same screens in the terminal).
+`cargo build --release` produces both programs: `target/release/Sam` (the window) and `target/release/Sam-tui` (the same screens in the terminal).
 
 ## How it works on macOS
 

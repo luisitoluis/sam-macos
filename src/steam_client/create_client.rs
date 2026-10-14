@@ -26,50 +26,6 @@ use std::sync::OnceLock;
 
 static STEAM_CLIENT_LIB: OnceLock<Library> = OnceLock::new(); // Make the lifetime 'static
 
-#[cfg(target_os = "linux")]
-pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::error::Error>> {
-    unsafe {
-        let steam_locator_lock = SteamLocator::global();
-        let mut steam_locator = steam_locator_lock.write()?;
-        let steamclient_lib_path = steam_locator
-            .get_lib_path(silent)
-            .ok_or(SamError::UnknownError)?;
-
-        let lib_steamclient = match Library::new(&steamclient_lib_path) {
-            Ok(lib) => lib,
-            Err(e) => {
-                eprintln!(
-                    "[STEAM CLIENT] Failed to open shared object at {} ({e})",
-                    steamclient_lib_path.display()
-                );
-                return Err(Box::new(e));
-            }
-        };
-
-        Ok(lib_steamclient)
-    }
-}
-
-#[cfg(target_os = "windows")]
-pub fn load_steamclient_library(silent: bool) -> Result<Library, Box<dyn std::error::Error>> {
-    use libloading::os::windows::{
-        self, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR,
-    };
-
-    unsafe {
-        let steam_locator_lock = SteamLocator::global();
-        let mut steam_locator = steam_locator_lock.write()?;
-        let steamclient_lib_path = steam_locator
-            .get_lib_path(silent)
-            .ok_or(SamError::UnknownError)?;
-        Ok(windows::Library::load_with_flags(
-            steamclient_lib_path,
-            LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
-        )?
-        .into())
-    }
-}
-
 /// macOS version - loads Steam client library.
 /// Uses dlopen under the hood via libloading.
 /// On Apple Silicon, this will load the Linux steamclient.so via Rosetta 2.

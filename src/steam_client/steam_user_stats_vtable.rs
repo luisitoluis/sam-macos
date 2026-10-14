@@ -23,26 +23,11 @@ use std::os::raw::{c_char, c_float, c_int};
 
 #[repr(C)]
 pub struct ISteamUserStatsVTable {
-    #[cfg(target_os = "windows")]
-    pub get_stat_float:
-        unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, *mut c_float) -> bool,
-    #[cfg(target_os = "windows")]
     pub get_stat_int32:
         unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, *mut c_int) -> bool,
-    #[cfg(target_os = "windows")]
-    pub set_stat_float: unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, c_float) -> bool,
-    #[cfg(target_os = "windows")]
-    pub set_stat_int32: unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, c_int) -> bool,
-
-    #[cfg(not(target_os = "windows"))]
-    pub get_stat_int32:
-        unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, *mut c_int) -> bool,
-    #[cfg(not(target_os = "windows"))]
     pub get_stat_float:
         unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, *mut c_float) -> bool,
-    #[cfg(not(target_os = "windows"))]
     pub set_stat_int32: unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, c_int) -> bool,
-    #[cfg(not(target_os = "windows"))]
     pub set_stat_float: unsafe extern "C" fn(*mut ISteamUserStats, *const c_char, c_float) -> bool,
 
     pub update_avg_rate_stat:

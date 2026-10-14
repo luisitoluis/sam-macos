@@ -33,7 +33,6 @@ impl SteamUser {
         }
     }
 
-    #[cfg(unix)]
     pub fn get_steam_id(&self) -> Result<CSteamID, SteamClientError> {
         unsafe {
             let vtable = (*self.inner.ptr)
@@ -42,22 +41,6 @@ impl SteamUser {
                 .ok_or(SteamClientError::NullVtable)?;
 
             let steam_id = (vtable.get_steam_id)(self.inner.ptr);
-            Ok(steam_id)
-        }
-    }
-
-    #[cfg(windows)]
-    pub fn get_steam_id(&self) -> Result<CSteamID, SteamClientError> {
-        unsafe {
-            let vtable = (*self.inner.ptr)
-                .vtable
-                .as_ref()
-                .ok_or(SteamClientError::NullVtable)?;
-
-            let mut id64 = 0u64;
-            (vtable.get_steam_id)(self.inner.ptr, &mut id64);
-            let steam_id = CSteamID { m_steamid: id64 };
-
             Ok(steam_id)
         }
     }
