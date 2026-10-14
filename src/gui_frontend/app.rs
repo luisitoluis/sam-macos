@@ -43,7 +43,8 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         "Sam",
         options,
         Box::new(move |cc| {
-            cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
+            cc.egui_ctx.set_theme(egui::ThemePreference::Light);
+            install_look(&cc.egui_ctx);
             install_onest(&cc.egui_ctx);
             Ok(Box::new(SamApp::new(auto_open)))
         }),
@@ -108,6 +109,141 @@ const CJK_SYSTEM_FACES: &[(&str, &str, u32)] = &[
 
 fn install_onest(ctx: &egui::Context) {
     ctx.set_fonts(gui_font_definitions());
+}
+
+fn install_look(ctx: &egui::Context) {
+    for theme in [egui::Theme::Light, egui::Theme::Dark] {
+        ctx.style_mut_of(theme, |style| {
+            tune_spacing(style);
+            tune_visuals(&mut style.visuals, theme == egui::Theme::Dark);
+        });
+    }
+}
+
+fn tune_spacing(style: &mut egui::Style) {
+    style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+    style.spacing.button_padding = egui::vec2(12.0, 6.0);
+    style.spacing.interact_size = egui::vec2(40.0, 34.0);
+    style.spacing.window_margin = egui::Margin::same(16);
+    style.spacing.menu_margin = egui::Margin::same(8);
+    style.spacing.icon_width = 16.0;
+    style.spacing.icon_width_inner = 9.0;
+    style.spacing.icon_spacing = 8.0;
+    style
+        .text_styles
+        .insert(egui::TextStyle::Small, egui::FontId::proportional(12.0));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Body, egui::FontId::proportional(14.5));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Button, egui::FontId::proportional(14.0));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Heading, egui::FontId::proportional(22.0));
+    style
+        .text_styles
+        .insert(egui::TextStyle::Monospace, egui::FontId::monospace(13.0));
+}
+
+fn tune_visuals(visuals: &mut egui::Visuals, dark: bool) {
+    let (ink, muted, hairline, canvas, card, field, accent, accent_soft, button, button_hover) =
+        if dark {
+            (
+                egui::Color32::from_rgb(236, 238, 242),
+                egui::Color32::from_rgb(156, 163, 175),
+                egui::Color32::from_rgb(52, 56, 66),
+                egui::Color32::from_rgb(17, 19, 23),
+                egui::Color32::from_rgb(28, 31, 37),
+                egui::Color32::from_rgb(22, 24, 29),
+                egui::Color32::from_rgb(143, 178, 255),
+                egui::Color32::from_rgb(36, 48, 74),
+                egui::Color32::from_rgb(36, 40, 48),
+                egui::Color32::from_rgb(48, 53, 64),
+            )
+        } else {
+            (
+                egui::Color32::from_rgb(28, 32, 38),
+                egui::Color32::from_rgb(107, 114, 128),
+                egui::Color32::from_rgb(226, 229, 234),
+                egui::Color32::from_rgb(245, 246, 248),
+                egui::Color32::WHITE,
+                egui::Color32::from_rgb(247, 248, 250),
+                egui::Color32::from_rgb(37, 99, 235),
+                egui::Color32::from_rgb(232, 240, 254),
+                egui::Color32::WHITE,
+                egui::Color32::from_rgb(243, 245, 248),
+            )
+        };
+    let radius = egui::CornerRadius::same(10);
+    let hair = egui::Stroke::new(1.0, hairline);
+    for widget in [
+        &mut visuals.widgets.noninteractive,
+        &mut visuals.widgets.inactive,
+        &mut visuals.widgets.hovered,
+        &mut visuals.widgets.active,
+        &mut visuals.widgets.open,
+    ] {
+        widget.corner_radius = radius;
+        widget.expansion = 0.0;
+    }
+
+    visuals.widgets.noninteractive.fg_stroke = egui::Stroke::new(1.0, ink);
+    visuals.widgets.noninteractive.bg_stroke = hair;
+    visuals.widgets.noninteractive.bg_fill = field;
+    visuals.widgets.noninteractive.weak_bg_fill = canvas;
+
+    visuals.widgets.inactive.fg_stroke = egui::Stroke::new(1.0, ink);
+    visuals.widgets.inactive.bg_stroke = hair;
+    visuals.widgets.inactive.bg_fill = field;
+    visuals.widgets.inactive.weak_bg_fill = button;
+
+    visuals.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, ink);
+    visuals.widgets.hovered.bg_stroke = hair;
+    visuals.widgets.hovered.bg_fill = button_hover;
+    visuals.widgets.hovered.weak_bg_fill = button_hover;
+
+    visuals.widgets.active.fg_stroke = egui::Stroke::new(1.5, accent);
+    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, accent);
+    visuals.widgets.active.bg_fill = accent_soft;
+    visuals.widgets.active.weak_bg_fill = accent_soft;
+    visuals.widgets.open = visuals.widgets.hovered;
+
+    visuals.selection.bg_fill = accent_soft;
+    visuals.selection.stroke = egui::Stroke::new(1.0, accent);
+    visuals.hyperlink_color = accent;
+    visuals.faint_bg_color = field;
+    visuals.extreme_bg_color = field;
+    visuals.text_edit_bg_color = Some(field);
+    visuals.code_bg_color = field;
+    visuals.warn_fg_color = egui::Color32::from_rgb(180, 110, 20);
+    visuals.error_fg_color = if dark {
+        egui::Color32::from_rgb(255, 160, 160)
+    } else {
+        egui::Color32::from_rgb(185, 48, 54)
+    };
+    visuals.override_text_color = Some(ink);
+    visuals.weak_text_color = Some(muted);
+    visuals.window_corner_radius = egui::CornerRadius::same(16);
+    visuals.menu_corner_radius = egui::CornerRadius::same(12);
+    visuals.window_fill = card;
+    visuals.window_stroke = hair;
+    visuals.window_shadow = egui::Shadow {
+        offset: [0, 10],
+        blur: 28,
+        spread: 0,
+        color: egui::Color32::from_black_alpha(if dark { 90 } else { 22 }),
+    };
+    visuals.popup_shadow = egui::Shadow {
+        offset: [0, 8],
+        blur: 18,
+        spread: 0,
+        color: egui::Color32::from_black_alpha(if dark { 80 } else { 18 }),
+    };
+    visuals.panel_fill = canvas;
+    visuals.window_highlight_topmost = false;
+    visuals.indent_has_left_vline = false;
+    visuals.interact_cursor = Some(egui::CursorIcon::PointingHand);
 }
 
 fn gui_font_definitions() -> egui::FontDefinitions {
@@ -269,7 +405,7 @@ impl SamApp {
             notice: Some(Ok(Message::Phrase(Id::LoadingLibrary))),
             confirm: None,
             auto_open,
-            theme: egui::ThemePreference::Dark,
+            theme: egui::ThemePreference::Light,
             language: Language::from_locale(),
             settings_open: false,
         };
@@ -538,7 +674,8 @@ impl SamApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
-                ui.label(text::t(language, Id::Appearance));
+                ui.set_min_width(300.0);
+                ui.weak(text::t(language, Id::Appearance));
                 ui.horizontal(|ui| {
                     ui.selectable_value(
                         &mut theme,
@@ -556,9 +693,10 @@ impl SamApp {
                         text::t(language, Id::ThemeLight),
                     );
                 });
-                ui.add_space(8.0);
-                ui.label(text::t(language, Id::Language));
+                ui.add_space(12.0);
+                ui.weak(text::t(language, Id::Language));
                 egui::ComboBox::from_id_salt("settings-language")
+                    .width(ui.available_width())
                     .selected_text(language.native_name())
                     .show_ui(ui, |ui| {
                         for option in Language::ALL {
@@ -583,17 +721,20 @@ impl SamApp {
                 .hint_text(text::t(self.language, Id::SearchGames))
                 .desired_width(f32::INFINITY),
         );
-        ui.checkbox(&mut self.hide_junk, text::t(self.language, Id::HideJunk));
-        if ui
-            .add_enabled(
-                self.inflight == 0,
-                egui::Button::new(text::t(self.language, Id::Refresh)),
-            )
-            .clicked()
-        {
-            actions.push(UiAction::RefreshApps);
-        }
-        ui.separator();
+        ui.horizontal(|ui| {
+            ui.checkbox(&mut self.hide_junk, text::t(self.language, Id::HideJunk));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui
+                    .add_enabled(
+                        self.inflight == 0,
+                        egui::Button::new(text::t(self.language, Id::Refresh)),
+                    )
+                    .clicked()
+                {
+                    actions.push(UiAction::RefreshApps);
+                }
+            });
+        });
 
         let query = self.search.to_lowercase();
         let visible: Vec<usize> = self
@@ -634,20 +775,25 @@ impl SamApp {
                 for index in visible {
                     let app = &self.apps[index];
                     let kind = text::t(self.language, kind_id(app.app_type));
-                    let label = format!("{}\n{} · {kind}", app.app_name, app.app_id);
-                    if ui
-                        .add_enabled(
-                            idle,
-                            egui::Button::selectable(selected == Some(app.app_id), label),
-                        )
-                        .clicked()
-                    {
-                        actions.push(UiAction::Open(app.app_id));
+                    let app_id = app.app_id;
+                    let name = app.app_name.clone();
+                    let meta = format!("{app_id} · {kind}");
+                    let response = clickable_card(
+                        ui,
+                        egui::Id::new(("library-row", app_id)),
+                        selected == Some(app_id),
+                        |ui| {
+                            ui.strong(name);
+                            ui.weak(meta);
+                        },
+                    );
+                    if idle && response.clicked() {
+                        actions.push(UiAction::Open(app_id));
                     }
                 }
             });
 
-        ui.separator();
+        ui.add_space(4.0);
         ui.weak(format!("Sam {}", env!("CARGO_PKG_VERSION")));
         actions
     }
@@ -656,8 +802,12 @@ impl SamApp {
         let busy = self.inflight > 0;
         let Some(game) = self.game.as_mut() else {
             ui.vertical_centered(|ui| {
-                ui.add_space(96.0);
-                ui.label(text::t(self.language, Id::SelectGame));
+                ui.add_space(140.0);
+                ui.label(
+                    egui::RichText::new(text::t(self.language, Id::SelectGame))
+                        .size(16.0)
+                        .color(ui.visuals().weak_text_color()),
+                );
             });
             return Vec::new();
         };
@@ -670,18 +820,17 @@ impl SamApp {
             if self.inflight > 0 {
                 ui.spinner();
             }
-            match &self.notice {
-                Some(Ok(message)) => {
-                    ui.label(message.text(self.language));
+            let text = match &self.notice {
+                Some(Ok(message)) => Ok(message.text(self.language)),
+                Some(Err(message)) => Err(message.text(self.language)),
+                None => Ok(text::t(self.language, Id::Ready).to_owned()),
+            };
+            match text {
+                Ok(message) => {
+                    ui.weak(message);
                 }
-                Some(Err(message)) => {
-                    ui.colored_label(
-                        egui::Color32::from_rgb(255, 140, 140),
-                        message.text(self.language),
-                    );
-                }
-                None => {
-                    ui.label(text::t(self.language, Id::Ready));
+                Err(message) => {
+                    ui.colored_label(ui.visuals().error_fg_color, message);
                 }
             }
         });
@@ -699,15 +848,17 @@ impl SamApp {
             .resizable(false)
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
+                ui.set_max_width(380.0);
                 ui.label(match confirm {
                     ConfirmAction::UnlockAll => text::t(language, Id::UnlockPrompt),
                     ConfirmAction::Reset => text::t(language, Id::ResetPrompt),
                 });
+                ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     if ui.button(text::t(language, Id::Cancel)).clicked() {
                         self.confirm = None;
                     }
-                    if ui.button(text::t(language, Id::Continue)).clicked() {
+                    if primary_button(ui, true, text::t(language, Id::Continue)).clicked() {
                         self.confirm = None;
                         actions.push(match confirm {
                             ConfirmAction::UnlockAll => UiAction::UnlockAll,
@@ -741,12 +892,33 @@ impl eframe::App for SamApp {
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let mut actions = Vec::new();
-        egui::Panel::bottom("status").show(ui, |ui| self.status_ui(ui));
+        let canvas = ui.visuals().panel_fill;
+        let card = ui.visuals().window_fill();
+        egui::Panel::bottom("status")
+            .show_separator_line(false)
+            .frame(
+                egui::Frame::new()
+                    .fill(canvas)
+                    .inner_margin(egui::Margin::symmetric(20, 8)),
+            )
+            .show(ui, |ui| self.status_ui(ui));
         egui::Panel::left("library")
             .resizable(true)
-            .default_size(320.0)
+            .default_size(300.0)
+            .show_separator_line(false)
+            .frame(
+                egui::Frame::new()
+                    .fill(card)
+                    .inner_margin(egui::Margin::same(16)),
+            )
             .show(ui, |ui| actions.extend(self.library_ui(ui)));
-        egui::CentralPanel::default().show(ui, |ui| actions.extend(self.game_ui(ui)));
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(canvas)
+                    .inner_margin(egui::Margin::same(20)),
+            )
+            .show(ui, |ui| actions.extend(self.game_ui(ui)));
         actions.extend(self.confirm_ui(ui.ctx()));
         self.settings_window(ui.ctx());
 
@@ -765,22 +937,27 @@ fn show_game(
     let mut actions = Vec::new();
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(!busy, egui::Button::new(text::t(language, Id::BackLibrary)))
+            .add_enabled(
+                !busy,
+                egui::Button::new(text::t(language, Id::BackLibrary)).frame(false),
+            )
             .clicked()
         {
             actions.push(UiAction::Close);
         }
-        ui.heading(&game.name);
-        if ui.button(text::t(language, Id::Launch)).clicked() {
-            actions.push(UiAction::Launch);
-        }
-        if ui
-            .add_enabled(!busy, egui::Button::new(text::t(language, Id::Refresh)))
-            .clicked()
-        {
-            actions.push(UiAction::Reload);
-        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if primary_button(ui, true, text::t(language, Id::Launch)).clicked() {
+                actions.push(UiAction::Launch);
+            }
+            if ui
+                .add_enabled(!busy, egui::Button::new(text::t(language, Id::Refresh)))
+                .clicked()
+            {
+                actions.push(UiAction::Reload);
+            }
+        });
     });
+    ui.heading(&game.name);
     ui.weak(format!(
         "{} · {} · {}",
         game.app_id,
@@ -791,19 +968,31 @@ fn show_game(
     if game.loading {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label(text::t(language, Id::TalkingToSteam));
+            ui.weak(text::t(language, Id::TalkingToSteam));
         });
     }
 
-    ui.horizontal(|ui| {
-        ui.selectable_value(
-            &mut game.tab,
-            GameTab::Achievements,
-            text::t(language, Id::Achievements),
-        );
-        ui.selectable_value(&mut game.tab, GameTab::Stats, text::t(language, Id::Stats));
-    });
-    ui.separator();
+    egui::Frame::new()
+        .fill(ui.visuals().extreme_bg_color)
+        .corner_radius(10)
+        .inner_margin(egui::Margin::same(4))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.spacing_mut().item_spacing.x = 4.0;
+                if segment(
+                    ui,
+                    game.tab == GameTab::Achievements,
+                    text::t(language, Id::Achievements),
+                )
+                .clicked()
+                {
+                    game.tab = GameTab::Achievements;
+                }
+                if segment(ui, game.tab == GameTab::Stats, text::t(language, Id::Stats)).clicked() {
+                    game.tab = GameTab::Stats;
+                }
+            });
+        });
 
     match game.tab {
         GameTab::Achievements => actions.extend(show_achievements(ui, game, busy, language)),
@@ -826,24 +1015,26 @@ fn show_achievements(
         .count();
     ui.horizontal(|ui| {
         ui.label(text::unlocked(language, unlocked, game.achievements.len()));
-        if ui
-            .add_enabled(
-                !busy && !game.loading,
-                egui::Button::new(text::t(language, Id::UnlockAll)),
-            )
-            .clicked()
-        {
-            actions.push(UiAction::AskUnlockAll);
-        }
-        if ui
-            .add_enabled(
-                !busy && !game.loading,
-                egui::Button::new(text::t(language, Id::ResetAll)),
-            )
-            .clicked()
-        {
-            actions.push(UiAction::AskReset);
-        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .add_enabled(
+                    !busy && !game.loading,
+                    egui::Button::new(text::t(language, Id::ResetAll)),
+                )
+                .clicked()
+            {
+                actions.push(UiAction::AskReset);
+            }
+            if ui
+                .add_enabled(
+                    !busy && !game.loading,
+                    egui::Button::new(text::t(language, Id::UnlockAll)),
+                )
+                .clicked()
+            {
+                actions.push(UiAction::AskUnlockAll);
+            }
+        });
     });
     ui.add(
         egui::TextEdit::singleline(&mut game.achievement_query)
@@ -871,39 +1062,46 @@ fn show_achievements(
             for index in visible {
                 let achievement = &mut game.achievements[index];
                 let protected = achievement.permission != 0;
-                ui.horizontal(|ui| {
-                    let mut achieved = achievement.is_achieved;
-                    let checkbox =
-                        ui.add_enabled(!busy && !protected, egui::Checkbox::new(&mut achieved, ""));
-                    if checkbox.changed() {
-                        achievement.is_achieved = achieved;
-                        actions.push(UiAction::SetAchievement {
-                            id: achievement.id.clone(),
-                            unlocked: achieved,
+                let mut achieved = achievement.is_achieved;
+                let id = achievement.id.clone();
+                let name = if achievement.name.is_empty() {
+                    achievement.id.clone()
+                } else {
+                    achievement.name.clone()
+                };
+                let description = achievement.description.clone();
+                let percent = achievement.global_achieved_percent;
+                card_frame(ui, false).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let checkbox = ui.add_enabled(
+                            !busy && !protected,
+                            egui::Checkbox::new(&mut achieved, ""),
+                        );
+                        if checkbox.changed() {
+                            actions.push(UiAction::SetAchievement {
+                                id: id.clone(),
+                                unlocked: achieved,
+                            });
+                        }
+                        ui.vertical(|ui| {
+                            ui.strong(name);
+                            if !description.is_empty() {
+                                ui.weak(description);
+                            }
+                            let mut meta = id;
+                            if protected {
+                                meta.push_str(" · ");
+                                meta.push_str(text::t(language, Id::Protected));
+                            }
+                            if let Some(percent) = percent {
+                                meta.push_str(" · ");
+                                meta.push_str(&text::of_players(language, percent));
+                            }
+                            ui.weak(meta);
                         });
-                    }
-                    ui.vertical(|ui| {
-                        ui.strong(if achievement.name.is_empty() {
-                            achievement.id.as_str()
-                        } else {
-                            achievement.name.as_str()
-                        });
-                        if !achievement.description.is_empty() {
-                            ui.weak(&achievement.description);
-                        }
-                        let mut meta = achievement.id.clone();
-                        if protected {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::Protected));
-                        }
-                        if let Some(percent) = achievement.global_achieved_percent {
-                            meta.push_str(" · ");
-                            meta.push_str(&text::of_players(language, percent));
-                        }
-                        ui.weak(meta);
                     });
                 });
-                ui.separator();
+                achievement.is_achieved = achieved;
             }
         });
     actions
@@ -947,42 +1145,133 @@ fn show_stats(
                     StatInfo::Float(stat) => stat.is_increment_only,
                 };
                 let draft = game.stat_drafts.entry(stat_id.clone()).or_default();
-                ui.horizontal(|ui| {
-                    ui.vertical(|ui| {
-                        ui.strong(if display_name.is_empty() {
-                            stat_id.as_str()
-                        } else {
-                            display_name.as_str()
-                        });
-                        let mut meta = stat_id.clone();
-                        if protected {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::Protected));
+                let title = if display_name.is_empty() {
+                    stat_id.clone()
+                } else {
+                    display_name
+                };
+                let mut meta = stat_id.clone();
+                if protected {
+                    meta.push_str(" · ");
+                    meta.push_str(text::t(language, Id::Protected));
+                }
+                if increment_only {
+                    meta.push_str(" · ");
+                    meta.push_str(text::t(language, Id::IncrementOnly));
+                }
+                card_frame(ui, false).show(ui, |ui| {
+                    ui.horizontal(|ui| {
+                        let text_width = (ui.available_width() - 210.0).max(120.0);
+                        ui.allocate_ui_with_layout(
+                            egui::vec2(text_width, 0.0),
+                            egui::Layout::top_down(egui::Align::Min),
+                            |ui| {
+                                ui.strong(title);
+                                ui.weak(meta);
+                            },
+                        );
+                        ui.add_enabled(
+                            !protected,
+                            egui::TextEdit::singleline(draft).desired_width(120.0),
+                        );
+                        if ui
+                            .add_enabled(
+                                !busy && !protected,
+                                egui::Button::new(text::t(language, Id::Save)),
+                            )
+                            .clicked()
+                        {
+                            actions.push(UiAction::SaveStat(stat_id));
                         }
-                        if increment_only {
-                            meta.push_str(" · ");
-                            meta.push_str(text::t(language, Id::IncrementOnly));
-                        }
-                        ui.weak(meta);
                     });
-                    ui.add_enabled(
-                        !protected,
-                        egui::TextEdit::singleline(draft).desired_width(120.0),
-                    );
-                    if ui
-                        .add_enabled(
-                            !busy && !protected,
-                            egui::Button::new(text::t(language, Id::Save)),
-                        )
-                        .clicked()
-                    {
-                        actions.push(UiAction::SaveStat(stat_id));
-                    }
                 });
-                ui.separator();
             }
         });
     actions
+}
+
+fn row_frame(ui: &egui::Ui, selected: bool) -> egui::Frame {
+    let visuals = ui.visuals();
+    if selected {
+        egui::Frame::new()
+            .fill(visuals.selection.bg_fill)
+            .stroke(egui::Stroke::new(1.0, visuals.selection.stroke.color))
+            .corner_radius(10)
+            .inner_margin(egui::Margin::symmetric(12, 8))
+    } else {
+        egui::Frame::new()
+            .corner_radius(10)
+            .inner_margin(egui::Margin::symmetric(12, 8))
+    }
+}
+
+fn card_frame(ui: &egui::Ui, selected: bool) -> egui::Frame {
+    let visuals = ui.visuals();
+    let fill = if selected {
+        visuals.selection.bg_fill
+    } else {
+        visuals.window_fill()
+    };
+    let stroke = if selected {
+        egui::Stroke::new(1.0, visuals.selection.stroke.color)
+    } else {
+        visuals.widgets.noninteractive.bg_stroke
+    };
+    egui::Frame::new()
+        .fill(fill)
+        .stroke(stroke)
+        .corner_radius(10)
+        .inner_margin(egui::Margin::symmetric(12, 10))
+}
+
+fn clickable_card(
+    ui: &mut egui::Ui,
+    id: egui::Id,
+    selected: bool,
+    body: impl FnOnce(&mut egui::Ui),
+) -> egui::Response {
+    let width = (ui.available_width() - if selected { 26.0 } else { 24.0 }).max(0.0);
+    let inner = row_frame(ui, selected).show(ui, |ui| {
+        ui.set_min_width(width);
+        body(ui);
+    });
+    ui.interact(inner.response.rect, id, egui::Sense::click())
+}
+
+fn primary_button(ui: &mut egui::Ui, enabled: bool, label: &str) -> egui::Response {
+    let accent = ui.visuals().selection.stroke.color;
+    let text = if ui.visuals().dark_mode {
+        egui::Color32::from_rgb(16, 18, 22)
+    } else {
+        egui::Color32::WHITE
+    };
+    ui.add_enabled(
+        enabled,
+        egui::Button::new(egui::RichText::new(label).color(text))
+            .fill(accent)
+            .stroke(egui::Stroke::NONE)
+            .corner_radius(10),
+    )
+}
+
+fn segment(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response {
+    let visuals = ui.visuals();
+    let color = if selected {
+        visuals.selection.stroke.color
+    } else {
+        visuals.weak_text_color()
+    };
+    ui.add(
+        egui::Button::new(egui::RichText::new(label).color(color))
+            .fill(if selected {
+                visuals.selection.bg_fill
+            } else {
+                egui::Color32::TRANSPARENT
+            })
+            .stroke(egui::Stroke::NONE)
+            .frame(selected)
+            .corner_radius(8),
+    )
 }
 
 fn kind_id(kind: AppModelType) -> Id {

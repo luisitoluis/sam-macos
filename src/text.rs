@@ -138,6 +138,11 @@ pub enum Id {
     KindJunk,
     Help,
     Quit,
+    CheckUpdates,
+    CheckingUpdates,
+    UpToDate,
+    UpdateAvailable,
+    UpdateCheckFailed,
 }
 
 pub fn t(lang: Language, id: Id) -> &'static str {
@@ -248,6 +253,11 @@ fn english(id: Id) -> &'static str {
         Id::KindJunk => "Junk",
         Id::Help => "Help",
         Id::Quit => "Quit",
+        Id::CheckUpdates => "Check for updates",
+        Id::CheckingUpdates => "Checking…",
+        Id::UpToDate => "Up to date",
+        Id::UpdateAvailable => "Update available",
+        Id::UpdateCheckFailed => "Could not check",
     }
 }
 
@@ -305,6 +315,11 @@ fn spanish(id: Id) -> &'static str {
         Id::KindJunk => "Basura",
         Id::Help => "Ayuda",
         Id::Quit => "Salir",
+        Id::CheckUpdates => "Buscar actualizaciones",
+        Id::CheckingUpdates => "Buscando…",
+        Id::UpToDate => "Al día",
+        Id::UpdateAvailable => "Hay una actualización",
+        Id::UpdateCheckFailed => "No se pudo comprobar",
     }
 }
 
@@ -362,6 +377,11 @@ fn chinese(id: Id) -> &'static str {
         Id::KindJunk => "无关",
         Id::Help => "帮助",
         Id::Quit => "退出",
+        Id::CheckUpdates => "检查更新",
+        Id::CheckingUpdates => "正在检查…",
+        Id::UpToDate => "已是最新",
+        Id::UpdateAvailable => "有可用更新",
+        Id::UpdateCheckFailed => "无法检查",
     }
 }
 
@@ -419,6 +439,11 @@ fn russian(id: Id) -> &'static str {
         Id::KindJunk => "Лишнее",
         Id::Help => "Справка",
         Id::Quit => "Выход",
+        Id::CheckUpdates => "Проверить обновления",
+        Id::CheckingUpdates => "Проверка…",
+        Id::UpToDate => "Уже последняя",
+        Id::UpdateAvailable => "Есть обновление",
+        Id::UpdateCheckFailed => "Не удалось проверить",
     }
 }
 
@@ -476,6 +501,11 @@ fn portuguese(id: Id) -> &'static str {
         Id::KindJunk => "Lixo",
         Id::Help => "Ajuda",
         Id::Quit => "Sair",
+        Id::CheckUpdates => "Procurar atualizações",
+        Id::CheckingUpdates => "Procurando…",
+        Id::UpToDate => "Atualizado",
+        Id::UpdateAvailable => "Há uma atualização",
+        Id::UpdateCheckFailed => "Não foi possível verificar",
     }
 }
 
@@ -533,6 +563,11 @@ fn german(id: Id) -> &'static str {
         Id::KindJunk => "Ausschuss",
         Id::Help => "Hilfe",
         Id::Quit => "Beenden",
+        Id::CheckUpdates => "Nach Updates suchen",
+        Id::CheckingUpdates => "Wird gesucht…",
+        Id::UpToDate => "Aktuell",
+        Id::UpdateAvailable => "Update verfügbar",
+        Id::UpdateCheckFailed => "Prüfung fehlgeschlagen",
     }
 }
 
@@ -590,6 +625,11 @@ fn french(id: Id) -> &'static str {
         Id::KindJunk => "Superflu",
         Id::Help => "Aide",
         Id::Quit => "Quitter",
+        Id::CheckUpdates => "Vérifier les mises à jour",
+        Id::CheckingUpdates => "Vérification…",
+        Id::UpToDate => "À jour",
+        Id::UpdateAvailable => "Mise à jour disponible",
+        Id::UpdateCheckFailed => "Vérification impossible",
     }
 }
 
@@ -647,6 +687,11 @@ fn japanese(id: Id) -> &'static str {
         Id::KindJunk => "不要",
         Id::Help => "ヘルプ",
         Id::Quit => "終了",
+        Id::CheckUpdates => "更新を確認",
+        Id::CheckingUpdates => "確認中…",
+        Id::UpToDate => "最新です",
+        Id::UpdateAvailable => "更新があります",
+        Id::UpdateCheckFailed => "確認できませんでした",
     }
 }
 
@@ -704,5 +749,10 @@ fn korean(id: Id) -> &'static str {
         Id::KindJunk => "불필요",
         Id::Help => "도움말",
         Id::Quit => "종료",
+        Id::CheckUpdates => "업데이트 확인",
+        Id::CheckingUpdates => "확인 중…",
+        Id::UpToDate => "최신 버전",
+        Id::UpdateAvailable => "업데이트 있음",
+        Id::UpdateCheckFailed => "확인할 수 없음",
     }
 }

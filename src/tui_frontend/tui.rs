@@ -30,9 +30,18 @@ use ratatui::{Frame, Terminal};
 use std::collections::HashMap;
 use std::io::{self, stdout};
 use std::process::Command;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread::JoinHandle;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::thread::{self, JoinHandle};
 use std::time::Duration;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum UpdateCheck {
+    Idle,
+    Checking,
+    Current,
+    Available,
+    Failed,
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Theme {
@@ -213,6 +222,9 @@ struct App {
     theme_query: String,
     theme_index: usize,
     theme_saved: Theme,
+    update_tx: Sender<UpdateCheck>,
+    update_rx: Receiver<UpdateCheck>,
+    update_check: UpdateCheck,
     quit: bool,
 }
 
@@ -257,6 +269,7 @@ fn event_loop(
 
 impl App {
     fn new(jobs: Sender<Job>, events: Receiver<UiEvent>, worker: JoinHandle<()>) -> Self {
+        let (update_tx, update_rx) = mpsc::channel();
         Self {
             jobs,
             events,
@@ -284,6 +297,9 @@ impl App {
                 .position(|theme| *theme == Theme::Opencode)
                 .unwrap_or(0),
             theme_saved: Theme::Opencode,
+            update_tx,
+            update_rx,
+            update_check: UpdateCheck::Idle,
             quit: false,
         }
     }
@@ -300,6 +316,9 @@ impl App {
         while let Ok(event) = self.events.try_recv() {
             self.inflight = self.inflight.saturating_sub(1);
             self.handle(event);
+        }
+        while let Ok(update) = self.update_rx.try_recv() {
+            self.update_check = update;
         }
     }
 
@@ -509,7 +528,7 @@ impl App {
             self.on_appearance_key(key);
             return;
         }
-        let last = Language::ALL.len();
+        let last = Language::ALL.len() + 1;
         match key.code {
             KeyCode::Esc | KeyCode::Char('s') => self.settings = false,
             KeyCode::Char('q') => self.quit = true,
@@ -531,10 +550,25 @@ impl App {
             self.open_appearance();
             return;
         }
+        if self.settings_index == Language::ALL.len() + 1 {
+            self.check_for_update();
+            return;
+        }
         let index = self.settings_index - 1;
         if let Some(language) = Language::ALL.get(index) {
             self.language = *language;
         }
+    }
+
+    fn check_for_update(&mut self) {
+        if self.update_check == UpdateCheck::Checking {
+            return;
+        }
+        self.update_check = UpdateCheck::Checking;
+        let tx = self.update_tx.clone();
+        thread::spawn(move || {
+            let _ = tx.send(query_update());
+        });
     }
 
     fn open_appearance(&mut self) {
@@ -1296,7 +1330,7 @@ impl App {
 
     fn draw_settings(&self, frame: &mut Frame, area: Rect) {
         let palette = palette(self.theme);
-        let popup = centered(area, 46, 16);
+        let popup = centered(area, 62, 18);
         frame.render_widget(Clear, popup);
         let block = bordered(text::t(self.language, Id::Settings), true, &palette);
         let inner = block.inner(popup);
@@ -1320,16 +1354,37 @@ impl App {
                 &palette,
             ));
         }
+        lines.push(Line::from(""));
+        lines.push(menu_row(
+            self.settings_index == Language::ALL.len() + 1,
+            text::t(self.language, Id::CheckUpdates),
+            self.update_label(),
+            &palette,
+        ));
 
+        let languages = Language::ALL.len();
         let cursor = if self.settings_index == 0 {
             0
-        } else {
+        } else if self.settings_index <= languages {
             self.settings_index + 2
+        } else {
+            self.settings_index + 3
         };
         let height = inner.height as usize;
         let offset = cursor.saturating_sub(height.saturating_sub(1));
         let visible: Vec<Line> = lines.into_iter().skip(offset).collect();
         frame.render_widget(Paragraph::new(visible), inner);
+    }
+
+    fn update_label(&self) -> &'static str {
+        let id = match self.update_check {
+            UpdateCheck::Idle => return env!("CARGO_PKG_VERSION"),
+            UpdateCheck::Checking => Id::CheckingUpdates,
+            UpdateCheck::Current => Id::UpToDate,
+            UpdateCheck::Available => Id::UpdateAvailable,
+            UpdateCheck::Failed => Id::UpdateCheckFailed,
+        };
+        text::t(self.language, id)
     }
 
     fn draw_appearance(&self, frame: &mut Frame, area: Rect) {
@@ -1618,6 +1673,39 @@ fn c(
         (br, bg, bb),
         (xr, xg, xb),
     )
+}
+
+fn query_update() -> UpdateCheck {
+    let local = env!("SAM_GIT_COMMIT");
+    if local.is_empty() {
+        return UpdateCheck::Failed;
+    }
+    let output = Command::new("git")
+        .args([
+            "ls-remote",
+            "git@github.com:luisitoluis/sam-macos-rs.git",
+            "refs/heads/master",
+        ])
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env(
+            "GIT_SSH_COMMAND",
+            "ssh -o BatchMode=yes -o ConnectTimeout=8",
+        )
+        .output();
+    match output {
+        Ok(output) if output.status.success() => {
+            let text = String::from_utf8_lossy(&output.stdout);
+            let remote = text.split_whitespace().next().unwrap_or("");
+            if remote.is_empty() {
+                UpdateCheck::Failed
+            } else if remote == local {
+                UpdateCheck::Current
+            } else {
+                UpdateCheck::Available
+            }
+        }
+        _ => UpdateCheck::Failed,
+    }
 }
 
 fn library_block(title: &str, focused: bool, palette: &Palette) -> Block<'static> {
