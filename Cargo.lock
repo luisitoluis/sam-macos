@@ -16,6 +16,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "skrifa",
 ]
 
 [[package]]

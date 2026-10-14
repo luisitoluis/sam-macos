@@ -44,7 +44,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         options,
         Box::new(move |cc| {
             cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
-            install_cascadia_code(&cc.egui_ctx);
+            install_onest(&cc.egui_ctx);
             Ok(Box::new(SamApp::new(auto_open)))
         }),
     ) {
@@ -56,34 +56,89 @@ pub fn run(auto_open: Option<u32>) -> u8 {
     }
 }
 
-fn install_cascadia_code(ctx: &egui::Context) {
-    let Some(bytes) = read_cascadia_code_nf() else {
-        eprintln!("Cascadia Code NF was not found; using the default font");
-        return;
-    };
+/// Onest variable subsets, Latin first. Later faces cover glyphs the earlier
+/// ones do not. Default egui faces stay after these as a fallback.
+///
+/// Onest has no Chinese, Japanese, or Korean. Those come from macOS system
+/// faces appended after the subsets.
+const ONEST_FACES: &[(&str, &[u8])] = &[
+    (
+        "Onest Latin",
+        include_bytes!("../../assets/fonts/onest-latin-wght-normal.ttf"),
+    ),
+    (
+        "Onest Latin Ext",
+        include_bytes!("../../assets/fonts/onest-latin-ext-wght-normal.ttf"),
+    ),
+    (
+        "Onest Cyrillic",
+        include_bytes!("../../assets/fonts/onest-cyrillic-wght-normal.ttf"),
+    ),
+    (
+        "Onest Cyrillic Ext",
+        include_bytes!("../../assets/fonts/onest-cyrillic-ext-wght-normal.ttf"),
+    ),
+    (
+        "Onest Vietnamese",
+        include_bytes!("../../assets/fonts/onest-vietnamese-wght-normal.ttf"),
+    ),
+    (
+        "Onest Symbols",
+        include_bytes!("../../assets/fonts/onest-symbols-wght-normal.ttf"),
+    ),
+    (
+        "Onest Math",
+        include_bytes!("../../assets/fonts/onest-math-wght-normal.ttf"),
+    ),
+];
 
-    let mut fonts = egui::FontDefinitions::default();
-    fonts.font_data.insert(
-        "Cascadia Code NF".to_owned(),
-        std::sync::Arc::new(egui::FontData::from_owned(bytes)),
-    );
-    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-        fonts
-            .families
-            .entry(family)
-            .or_default()
-            .insert(0, "Cascadia Code NF".to_owned());
-    }
-    ctx.set_fonts(fonts);
+/// Simplified Chinese and Japanese, then Korean. Face 0 is the regular weight.
+const CJK_SYSTEM_FACES: &[(&str, &str, u32)] = &[
+    (
+        "Hiragino Sans GB",
+        "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        0,
+    ),
+    (
+        "Apple SD Gothic Neo",
+        "/System/Library/Fonts/AppleSDGothicNeo.ttc",
+        0,
+    ),
+];
+
+fn install_onest(ctx: &egui::Context) {
+    ctx.set_fonts(gui_font_definitions());
 }
 
-fn read_cascadia_code_nf() -> Option<Vec<u8>> {
-    let mut paths = Vec::new();
-    if let Some(home) = std::env::var_os("HOME") {
-        paths.push(std::path::PathBuf::from(home).join("Library/Fonts/CascadiaCodeNF.ttf"));
+fn gui_font_definitions() -> egui::FontDefinitions {
+    let mut fonts = egui::FontDefinitions::default();
+    let mut names = Vec::new();
+    for (name, bytes) in ONEST_FACES {
+        fonts.font_data.insert(
+            (*name).to_owned(),
+            std::sync::Arc::new(egui::FontData::from_static(bytes)),
+        );
+        names.push((*name).to_owned());
     }
-    paths.push(std::path::PathBuf::from("/Library/Fonts/CascadiaCodeNF.ttf"));
-    paths.into_iter().find_map(|path| std::fs::read(path).ok())
+    for (name, path, index) in CJK_SYSTEM_FACES {
+        let Ok(bytes) = std::fs::read(path) else {
+            eprintln!("{name} was not found; some languages may not render");
+            continue;
+        };
+        let mut data = egui::FontData::from_owned(bytes);
+        data.index = *index;
+        fonts
+            .font_data
+            .insert((*name).to_owned(), std::sync::Arc::new(data));
+        names.push((*name).to_owned());
+    }
+    for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
+        let list = fonts.families.entry(family).or_default();
+        for (offset, name) in names.iter().enumerate() {
+            list.insert(offset, name.clone());
+        }
+    }
+    fonts
 }
 
 enum Job {
@@ -1089,5 +1144,44 @@ fn save_stat(app_id: u32, stat_id: String, value: StatValue) -> UiEvent {
             message: Id::StatSaved,
         },
         Err(err) => UiEvent::Notice(Err(err.to_string())),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::gui_font_definitions;
+    use eframe::egui;
+
+    #[test]
+    fn cjk_fallbacks_cover_language_names() {
+        let definitions = gui_font_definitions();
+        let family = definitions
+            .families
+            .get(&egui::FontFamily::Proportional)
+            .cloned()
+            .unwrap_or_default();
+        let mut fonts = egui::text::Fonts::new(egui::epaint::TextOptions::default(), definitions);
+        let font_id = egui::FontId::proportional(16.0);
+        for sample in ["简体中文", "日本語", "한국어"] {
+            let galley = fonts.layout_no_wrap(sample.to_owned(), font_id.clone(), egui::Color32::WHITE);
+            let replacement = fonts.layout_no_wrap(
+                "◻".repeat(sample.chars().count()),
+                font_id.clone(),
+                egui::Color32::WHITE,
+            );
+            assert_ne!(
+                galley.rect.width(),
+                replacement.rect.width(),
+                "{sample} laid out as the missing-glyph box; family {family:?}"
+            );
+            assert!(
+                galley
+                    .rows
+                    .iter()
+                    .flat_map(|row| row.row.glyphs.iter())
+                    .all(|glyph| glyph.uv_rect.size.x > 0.0 && glyph.uv_rect.size.y > 0.0),
+                "{sample} has an empty glyph; family {family:?}"
+            );
+        }
     }
 }
