@@ -21,6 +21,7 @@ use crate::gui_frontend::request::{
     UnlockAllAchievements,
 };
 use crate::text::{self, Id, Language, Message};
+use super::theme::GuiTheme;
 use eframe::egui;
 use std::collections::HashMap;
 use std::process::Command;
@@ -46,8 +47,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         "Sam",
         options,
         Box::new(move |cc| {
-            cc.egui_ctx.set_theme(egui::ThemePreference::Dark);
-            install_look(&cc.egui_ctx);
+            install_look(&cc.egui_ctx, GuiTheme::Opencode);
             install_onest(&cc.egui_ctx);
             Ok(Box::new(SamApp::new(auto_open)))
         }),
@@ -114,11 +114,12 @@ fn install_onest(ctx: &egui::Context) {
     ctx.set_fonts(gui_font_definitions());
 }
 
-fn install_look(ctx: &egui::Context) {
-    for theme in [egui::Theme::Light, egui::Theme::Dark] {
-        ctx.style_mut_of(theme, |style| {
+fn install_look(ctx: &egui::Context, theme: GuiTheme) {
+    let palette = theme.palette();
+    for egui_theme in [egui::Theme::Light, egui::Theme::Dark] {
+        ctx.style_mut_of(egui_theme, |style| {
             tune_spacing(style);
-            tune_visuals(&mut style.visuals, theme == egui::Theme::Dark);
+            tune_visuals(&mut style.visuals, &palette);
         });
     }
 }
@@ -149,35 +150,21 @@ fn tune_spacing(style: &mut egui::Style) {
         .insert(egui::TextStyle::Monospace, egui::FontId::monospace(13.0));
 }
 
-fn tune_visuals(visuals: &mut egui::Visuals, dark: bool) {
-    let (ink, muted, hairline, canvas, card, field, accent, accent_soft, button, button_hover) =
-        if dark {
-            (
-                egui::Color32::WHITE,
-                egui::Color32::from_rgba_unmultiplied(255, 255, 255, 170),
-                egui::Color32::from_white_alpha(36),
-                egui::Color32::from_rgb(76, 29, 149),
-                egui::Color32::from_rgb(59, 18, 120),
-                egui::Color32::from_black_alpha(48),
-                egui::Color32::from_rgb(214, 51, 214),
-                egui::Color32::from_rgb(124, 74, 196),
-                egui::Color32::from_white_alpha(18),
-                egui::Color32::from_white_alpha(32),
-            )
-        } else {
-            (
-                egui::Color32::from_rgb(59, 18, 110),
-                egui::Color32::from_rgb(110, 78, 150),
-                egui::Color32::from_rgb(220, 206, 240),
-                egui::Color32::from_rgb(245, 240, 255),
-                egui::Color32::WHITE,
-                egui::Color32::from_rgb(237, 229, 252),
-                egui::Color32::from_rgb(168, 40, 176),
-                egui::Color32::from_rgb(232, 214, 255),
-                egui::Color32::WHITE,
-                egui::Color32::from_rgb(243, 232, 255),
-            )
-        };
+fn tune_visuals(visuals: &mut egui::Visuals, palette: &super::theme::Palette) {
+    let ink = palette.text;
+    let muted = palette.muted;
+    let hairline = palette.border;
+    let canvas = palette.background;
+    let card = palette.background;
+    let field = palette.border;
+    let accent = palette.primary;
+    let accent_soft = palette.primary;
+    let button = palette.background;
+    let button_hover = palette.border;
+    let dark = {
+        let [r, g, b, _] = palette.background.to_array();
+        u16::from(r) + u16::from(g) + u16::from(b) < 380
+    };
     let radius = egui::CornerRadius::same(14);
     let hair = egui::Stroke::new(1.0, hairline);
     for widget in [
@@ -213,7 +200,7 @@ fn tune_visuals(visuals: &mut egui::Visuals, dark: bool) {
     visuals.widgets.open = visuals.widgets.hovered;
 
     visuals.selection.bg_fill = accent_soft;
-    visuals.selection.stroke = egui::Stroke::NONE;
+    visuals.selection.stroke = egui::Stroke::new(1.0, canvas);
     visuals.hyperlink_color = accent;
     visuals.dark_mode = dark;
     visuals.faint_bg_color = field;
@@ -221,11 +208,7 @@ fn tune_visuals(visuals: &mut egui::Visuals, dark: bool) {
     visuals.text_edit_bg_color = Some(field);
     visuals.code_bg_color = field;
     visuals.warn_fg_color = egui::Color32::from_rgb(180, 110, 20);
-    visuals.error_fg_color = if dark {
-        egui::Color32::from_rgb(255, 160, 160)
-    } else {
-        egui::Color32::from_rgb(185, 48, 54)
-    };
+    visuals.error_fg_color = palette.error;
     visuals.override_text_color = Some(ink);
     visuals.weak_text_color = Some(muted);
     visuals.window_corner_radius = egui::CornerRadius::same(16);
@@ -393,7 +376,8 @@ struct SamApp {
     notice: Option<Result<Message, Message>>,
     confirm: Option<ConfirmAction>,
     auto_open: Option<u32>,
-    theme: egui::ThemePreference,
+    theme: GuiTheme,
+    theme_query: String,
     language: Language,
     settings_open: bool,
     update_tx: Sender<UpdateCheck>,
@@ -422,7 +406,8 @@ impl SamApp {
             notice: Some(Ok(Message::Phrase(Id::LoadingLibrary))),
             confirm: None,
             auto_open,
-            theme: egui::ThemePreference::Dark,
+            theme: GuiTheme::Opencode,
+            theme_query: String::new(),
             language: Language::from_locale(),
             settings_open: false,
             update_tx,
@@ -689,6 +674,7 @@ impl SamApp {
     fn settings_window(&mut self, ctx: &egui::Context) {
         let mut open = self.settings_open;
         let mut theme = self.theme;
+        let mut theme_query = self.theme_query.clone();
         let mut language = self.language;
         let mut check_updates = false;
         let update_status = self.update_label();
@@ -701,23 +687,26 @@ impl SamApp {
             .show(ctx, |ui| {
                 ui.set_min_width(300.0);
                 ui.weak(text::t(language, Id::Appearance));
-                ui.horizontal(|ui| {
-                    ui.selectable_value(
-                        &mut theme,
-                        egui::ThemePreference::System,
-                        text::t(language, Id::ThemeSystem),
-                    );
-                    ui.selectable_value(
-                        &mut theme,
-                        egui::ThemePreference::Dark,
-                        text::t(language, Id::ThemeDark),
-                    );
-                    ui.selectable_value(
-                        &mut theme,
-                        egui::ThemePreference::Light,
-                        text::t(language, Id::ThemeLight),
-                    );
-                });
+                ui.add(
+                    egui::TextEdit::singleline(&mut theme_query)
+                        .hint_text(text::t(language, Id::Search))
+                        .desired_width(f32::INFINITY),
+                );
+                let query = theme_query.to_lowercase();
+                egui::ScrollArea::vertical()
+                    .id_salt("appearance-themes")
+                    .max_height(220.0)
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| {
+                        for option in GuiTheme::ALL {
+                            if !query.is_empty() && !option.name().contains(&query) {
+                                continue;
+                            }
+                            if ui.selectable_label(option == theme, option.name()).clicked() {
+                                theme = option;
+                            }
+                        }
+                    });
                 ui.add_space(12.0);
                 ui.weak(text::t(language, Id::Language));
                 egui::ComboBox::from_id_salt("settings-language")
@@ -738,8 +727,9 @@ impl SamApp {
             });
         if self.theme != theme {
             self.theme = theme;
-            ctx.set_theme(theme);
+            install_look(ctx, theme);
         }
+        self.theme_query = theme_query;
         self.language = language;
         self.settings_open = open;
         if check_updates {
@@ -960,11 +950,7 @@ impl eframe::App for SamApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let mut actions = Vec::new();
         paint_backdrop(ui);
-        let rail = if ui.visuals().dark_mode {
-            egui::Color32::from_black_alpha(42)
-        } else {
-            egui::Color32::from_white_alpha(150)
-        };
+        let rail = ui.visuals().panel_fill;
         egui::Panel::left("library")
             .resizable(true)
             .default_size(220.0)
@@ -1288,14 +1274,9 @@ fn show_stats(
 
 fn problem_banner(ui: &mut egui::Ui, message: &str) {
     let message = message.strip_prefix("SAM: ").unwrap_or(message).trim();
-    let dark = ui.visuals().dark_mode;
     let width = (ui.available_width() - 34.0).max(0.0);
     egui::Frame::new()
-        .fill(if dark {
-            egui::Color32::from_white_alpha(20)
-        } else {
-            egui::Color32::from_white_alpha(220)
-        })
+        .fill(ui.visuals().faint_bg_color)
         .stroke(egui::Stroke::new(1.0, ui.visuals().error_fg_color))
         .corner_radius(14)
         .inner_margin(egui::Margin::symmetric(16, 12))
@@ -1311,21 +1292,8 @@ fn problem_banner(ui: &mut egui::Ui, message: &str) {
 
 fn paint_backdrop(ui: &egui::Ui) {
     let rect = ui.ctx().viewport_rect();
-    let (top_left, top_right, bottom_left, bottom_right) = if ui.visuals().dark_mode {
-        (
-            egui::Color32::from_rgb(168, 72, 230),
-            egui::Color32::from_rgb(88, 36, 176),
-            egui::Color32::from_rgb(104, 32, 168),
-            egui::Color32::from_rgb(28, 8, 72),
-        )
-    } else {
-        (
-            egui::Color32::from_rgb(250, 244, 255),
-            egui::Color32::from_rgb(237, 224, 255),
-            egui::Color32::from_rgb(255, 250, 255),
-            egui::Color32::from_rgb(226, 210, 252),
-        )
-    };
+    let color = ui.visuals().panel_fill;
+    let (top_left, top_right, bottom_left, bottom_right) = (color, color, color, color);
     let mut mesh = egui::Mesh::default();
     mesh.vertices.extend([
         egui::epaint::Vertex::untextured(rect.left_top(), top_left),
@@ -1352,21 +1320,10 @@ fn row_frame(ui: &egui::Ui, selected: bool) -> egui::Frame {
 }
 
 fn card_frame(ui: &egui::Ui, _selected: bool) -> egui::Frame {
-    let dark = ui.visuals().dark_mode;
+    let visuals = ui.visuals();
     egui::Frame::new()
-        .fill(if dark {
-            egui::Color32::from_white_alpha(16)
-        } else {
-            egui::Color32::from_white_alpha(210)
-        })
-        .stroke(egui::Stroke::new(
-            1.0,
-            if dark {
-                egui::Color32::from_white_alpha(28)
-            } else {
-                ui.visuals().widgets.noninteractive.bg_stroke.color
-            },
-        ))
+        .fill(visuals.faint_bg_color)
+        .stroke(visuals.widgets.noninteractive.bg_stroke)
         .corner_radius(14)
         .inner_margin(egui::Margin::symmetric(14, 10))
 }
@@ -1380,6 +1337,10 @@ fn clickable_card(
     let width = (ui.available_width() - if selected { 26.0 } else { 24.0 }).max(0.0);
     let inner = row_frame(ui, selected).show(ui, |ui| {
         ui.set_min_width(width);
+        if selected {
+            let on_primary = ui.visuals().window_fill();
+            ui.style_mut().visuals.override_text_color = Some(on_primary);
+        }
         body(ui);
     });
     ui.interact(inner.response.rect, id, egui::Sense::click())
@@ -1390,7 +1351,7 @@ fn primary_button(ui: &mut egui::Ui, enabled: bool, label: &str) -> egui::Respon
         enabled,
         egui::Button::new(
             egui::RichText::new(label)
-                .color(egui::Color32::WHITE)
+                .color(ui.visuals().window_fill())
                 .size(15.0),
         )
         .fill(ui.visuals().hyperlink_color)
@@ -1403,7 +1364,7 @@ fn primary_button(ui: &mut egui::Ui, enabled: bool, label: &str) -> egui::Respon
 fn segment(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response {
     let visuals = ui.visuals();
     let color = if selected {
-        visuals.text_color()
+        visuals.window_fill()
     } else {
         visuals.weak_text_color()
     };

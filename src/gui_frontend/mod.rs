@@ -15,6 +15,7 @@
 
 mod app;
 mod request;
+mod theme;
 
 use crate::gui_frontend::request::Request;
 use crate::utils::bidir_child::BidirChild;
