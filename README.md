@@ -21,7 +21,7 @@ Steam Achievement Manager For macOS
 This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) that adds macOS support (Apple Silicon & Intel).
 
 **Key features:**
-- ✅ Native macOS support (M1/M2/M3/M4)
+- ✅ Native macOS support (All Apple Silicon)
 - ✅ Uses Steam Linux client via Rosetta 2
 - ✅ No .NET Framework required
 - ✅ Native macOS window 
@@ -41,7 +41,7 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 ## Installation
 
 ### Option 1: Pre-built (if available)
-Download from the [Releases page](https://github.com/gentleman-programming/SteamAchievementManager/releases).
+Download from the [Releases page](https://github.com/luisitoluis/sam-macos-rs/releases).
 
 ### Option 2: Build from source
 ```bash
