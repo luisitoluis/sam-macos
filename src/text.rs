@@ -42,6 +42,24 @@ impl Language {
         Language::Korean,
     ];
 
+    pub fn code(self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::Spanish => "es",
+            Language::Chinese => "zh",
+            Language::Russian => "ru",
+            Language::Portuguese => "pt",
+            Language::German => "de",
+            Language::French => "fr",
+            Language::Japanese => "ja",
+            Language::Korean => "ko",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|language| language.code() == code)
+    }
+
     pub fn native_name(self) -> &'static str {
         match self {
             Language::English => "English",

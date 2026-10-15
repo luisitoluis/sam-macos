@@ -47,9 +47,11 @@ pub fn run(auto_open: Option<u32>) -> u8 {
         "Sam",
         options,
         Box::new(move |cc| {
-            install_look(&cc.egui_ctx, GuiTheme::Opencode);
+            let mut app = SamApp::new(auto_open);
+            app.restore();
+            install_look(&cc.egui_ctx, app.theme);
             install_onest(&cc.egui_ctx);
-            Ok(Box::new(SamApp::new(auto_open)))
+            Ok(Box::new(app))
         }),
     ) {
         Ok(()) => 0,
@@ -703,36 +705,74 @@ impl SamApp {
             .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
             .show(ctx, |ui| {
                 ui.set_min_width(300.0);
+                let picker_width = (ui.available_width() * 0.78).max(180.0);
+                let picker_height = (ui.spacing().interact_size.y - 6.0).max(26.0);
                 ui.weak(text::t(language, Id::Appearance));
-                ui.add(
-                    egui::TextEdit::singleline(&mut theme_query)
-                        .hint_text(text::t(language, Id::Search))
-                        .desired_width(f32::INFINITY),
-                );
-                let query = theme_query.to_lowercase();
-                egui::ScrollArea::vertical()
-                    .id_salt("appearance-themes")
-                    .max_height(220.0)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        for option in GuiTheme::ALL {
-                            if !query.is_empty() && !option.name().contains(&query) {
-                                continue;
-                            }
-                            if ui.selectable_label(option == theme, option.name()).clicked() {
-                                theme = option;
-                            }
-                        }
+                let theme_popup = egui::Id::new("settings-themes");
+                let theme_button =
+                    picker_button(ui, theme_popup, picker_width, picker_height, theme.name());
+                egui::Popup::menu(&theme_button)
+                    .id(theme_popup)
+                    .align(egui::RectAlign::BOTTOM_START)
+                    .align_alternatives(&[])
+                    .close_behavior(egui::PopupCloseBehavior::CloseOnClickOutside)
+                    .width(picker_width)
+                    .show(|ui| {
+                        ui.set_max_width(picker_width);
+                        ui.add(
+                            egui::TextEdit::singleline(&mut theme_query)
+                                .hint_text(text::t(language, Id::Search))
+                                .desired_width(picker_width),
+                        );
+                        let query = theme_query.to_lowercase();
+                        egui::ScrollArea::vertical()
+                            .id_salt("appearance-themes")
+                            .max_height(220.0)
+                            .show(ui, |ui| {
+                                ui.set_max_width(picker_width);
+                                for option in GuiTheme::ALL {
+                                    if !query.is_empty() && !option.name().contains(&query) {
+                                        continue;
+                                    }
+                                    if ui.selectable_label(option == theme, option.name()).clicked()
+                                    {
+                                        theme = option;
+                                        egui::Popup::close_id(ui.ctx(), theme_popup);
+                                    }
+                                }
+                            });
                     });
                 ui.add_space(12.0);
                 ui.weak(text::t(language, Id::Language));
-                egui::ComboBox::from_id_salt("settings-language")
-                    .width(ui.available_width())
-                    .selected_text(language.native_name())
-                    .show_ui(ui, |ui| {
-                        for option in Language::ALL {
-                            ui.selectable_value(&mut language, option, option.native_name());
-                        }
+                let language_popup = egui::Id::new("settings-language");
+                let language_button = picker_button(
+                    ui,
+                    language_popup,
+                    picker_width,
+                    picker_height,
+                    language.native_name(),
+                );
+                egui::Popup::menu(&language_button)
+                    .id(language_popup)
+                    .align(egui::RectAlign::BOTTOM_START)
+                    .align_alternatives(&[])
+                    .width(picker_width)
+                    .show(|ui| {
+                        ui.set_max_width(picker_width);
+                        egui::ScrollArea::vertical()
+                            .id_salt("settings-languages")
+                            .max_height(220.0)
+                            .show(ui, |ui| {
+                                ui.set_max_width(picker_width);
+                                for option in Language::ALL {
+                                    if ui
+                                        .selectable_value(&mut language, option, option.native_name())
+                                        .clicked()
+                                    {
+                                        egui::Popup::close_id(ui.ctx(), language_popup);
+                                    }
+                                }
+                            });
                     });
                 ui.add_space(12.0);
                 ui.horizontal(|ui| {
@@ -763,6 +803,37 @@ impl SamApp {
         thread::spawn(move || {
             let _ = tx.send(query_update());
         });
+    }
+
+    fn restore(&mut self) {
+        let Some(path) = gui_settings_path() else {
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let Ok(saved) = serde_json::from_str::<GuiSettings>(&raw) else {
+            return;
+        };
+        if let Some(theme) = GuiTheme::from_name(&saved.theme) {
+            self.theme = theme;
+        }
+        if let Some(language) = Language::from_code(&saved.language) {
+            self.language = language;
+        }
+    }
+
+    fn store_settings(&self) {
+        let Some(path) = gui_settings_path() else {
+            return;
+        };
+        let saved = GuiSettings {
+            theme: self.theme.name().to_owned(),
+            language: self.language.code().to_owned(),
+        };
+        if let Ok(raw) = serde_json::to_string(&saved) {
+            let _ = std::fs::write(path, raw);
+        }
     }
 
     fn update_label(&self) -> String {
@@ -947,6 +1018,7 @@ impl SamApp {
 
 impl Drop for SamApp {
     fn drop(&mut self) {
+        self.store_settings();
         let _ = self.jobs.send(Job::Shutdown);
         if self
             .shutdown_done
@@ -965,6 +1037,8 @@ impl eframe::App for SamApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        let theme_before = self.theme;
+        let language_before = self.language;
         let mut actions = Vec::new();
         paint_backdrop(ui);
         let rail = ui.visuals().panel_fill;
@@ -1017,6 +1091,9 @@ impl eframe::App for SamApp {
 
         for action in actions {
             self.apply(action);
+        }
+        if self.theme != theme_before || self.language != language_before {
+            self.store_settings();
         }
     }
 }
@@ -1293,6 +1370,76 @@ fn show_stats(
             }
         });
     actions
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct GuiSettings {
+    theme: String,
+    language: String,
+}
+
+fn gui_settings_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let dir = std::path::PathBuf::from(home).join("Library/Application Support/Sam");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir.join("gui-settings.json"))
+}
+
+fn picker_button(
+    ui: &mut egui::Ui,
+    popup_id: egui::Id,
+    width: f32,
+    height: f32,
+    label: &str,
+) -> egui::Response {
+    let (rect, response) =
+        ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
+    let open = egui::Popup::is_id_open(ui.ctx(), popup_id);
+    let turn = ui
+        .ctx()
+        .animate_bool_with_time(popup_id.with("chevron"), open, 0.16);
+    if ui.is_rect_visible(rect) {
+        let visuals = ui.style().interact(&response);
+        ui.painter().rect(
+            rect,
+            visuals.corner_radius,
+            visuals.weak_bg_fill,
+            visuals.bg_stroke,
+            egui::StrokeKind::Inside,
+        );
+        let galley = egui::WidgetText::from(label).into_galley(
+            ui,
+            Some(egui::TextWrapMode::Truncate),
+            (width - 36.0).max(0.0),
+            egui::TextStyle::Button,
+        );
+        let text_pos = egui::pos2(
+            rect.left() + 12.0,
+            rect.center().y - galley.size().y * 0.5,
+        );
+        ui.painter().galley(text_pos, galley, visuals.text_color());
+        paint_chevron(
+            ui.painter(),
+            egui::pos2(rect.right() - 16.0, rect.center().y),
+            visuals.text_color(),
+            turn,
+        );
+    }
+    response
+}
+
+fn paint_chevron(painter: &egui::Painter, center: egui::Pos2, color: egui::Color32, open: f32) {
+    let rot = egui::emath::Rot2::from_angle(open * std::f32::consts::PI);
+    let arm = 4.5;
+    let points = [
+        egui::vec2(-arm, -arm * 0.35),
+        egui::vec2(0.0, arm * 0.45),
+        egui::vec2(arm, -arm * 0.35),
+    ]
+    .map(|point| center + rot * point);
+    let stroke = egui::Stroke::new(1.6, color);
+    painter.line_segment([points[0], points[1]], stroke);
+    painter.line_segment([points[1], points[2]], stroke);
 }
 
 fn problem_banner(ui: &mut egui::Ui, message: &str) {

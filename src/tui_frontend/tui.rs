@@ -154,6 +154,10 @@ impl Theme {
             Theme::Zenburn => "zenburn",
         }
     }
+
+    fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|theme| theme.name() == name)
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -236,8 +240,10 @@ pub fn run() -> io::Result<()> {
     let result = {
         let (jobs, events, worker) = worker::spawn();
         let mut app = App::new(jobs, events, worker);
+        app.restore();
         app.send(Job::LoadApps);
         let result = event_loop(&mut terminal, &mut app);
+        app.store();
         let _ = app.jobs.send(Job::Shutdown);
         if let Some(worker) = app.worker.take() {
             let _ = worker.join();
@@ -557,6 +563,48 @@ impl App {
         let index = self.settings_index - 1;
         if let Some(language) = Language::ALL.get(index) {
             self.language = *language;
+            self.store();
+        }
+    }
+
+    fn restore(&mut self) {
+        let Some(path) = settings_path() else {
+            return;
+        };
+        let Ok(raw) = std::fs::read_to_string(path) else {
+            return;
+        };
+        let Ok(saved) = serde_json::from_str::<TuiSettings>(&raw) else {
+            return;
+        };
+        if let Some(theme) = Theme::from_name(&saved.theme) {
+            self.theme = theme;
+            self.theme_saved = theme;
+            self.theme_index = Theme::ALL
+                .iter()
+                .position(|item| *item == theme)
+                .unwrap_or(0);
+        }
+        if let Some(language) = Language::from_code(&saved.language) {
+            self.language = language;
+        }
+    }
+
+    fn store(&self) {
+        let Some(path) = settings_path() else {
+            return;
+        };
+        let theme = if self.appearance {
+            self.theme_saved
+        } else {
+            self.theme
+        };
+        let saved = TuiSettings {
+            theme: theme.name().to_owned(),
+            language: self.language.code().to_owned(),
+        };
+        if let Ok(raw) = serde_json::to_string(&saved) {
+            let _ = std::fs::write(path, raw);
         }
     }
 
@@ -587,7 +635,11 @@ impl App {
                 self.theme = self.theme_saved;
                 self.appearance = false;
             }
-            KeyCode::Enter => self.appearance = false,
+            KeyCode::Enter => {
+                self.theme_saved = self.theme;
+                self.appearance = false;
+                self.store();
+            }
             KeyCode::Up => self.move_theme(-1),
             KeyCode::Down => self.move_theme(1),
             KeyCode::PageUp => self.move_theme(-10),
@@ -1706,6 +1758,19 @@ fn query_update() -> UpdateCheck {
         }
         _ => UpdateCheck::Failed,
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct TuiSettings {
+    theme: String,
+    language: String,
+}
+
+fn settings_path() -> Option<std::path::PathBuf> {
+    let home = std::env::var_os("HOME")?;
+    let dir = std::path::PathBuf::from(home).join("Library/Application Support/Sam");
+    std::fs::create_dir_all(&dir).ok()?;
+    Some(dir.join("tui-settings.json"))
 }
 
 fn library_block(title: &str, focused: bool, palette: &Palette) -> Block<'static> {

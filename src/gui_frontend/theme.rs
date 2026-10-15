@@ -137,6 +137,10 @@ impl GuiTheme {
         }
     }
 
+    pub fn from_name(name: &str) -> Option<Self> {
+        Self::ALL.into_iter().find(|theme| theme.name() == name)
+    }
+
     pub fn palette(self) -> Palette {
         let (text, muted, error, primary, background, border) = match self {
             GuiTheme::Aura => c(237, 236, 238, 109, 109, 109, 255, 103, 103, 162, 119, 255, 15, 15, 15, 45, 45, 45),
