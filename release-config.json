@@ -1,0 +1,11 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "bootstrap-sha": "38d1f4a6996554310c76548141bca950ef804712",
+  "packages": {
+    ".": {
+      "release-type": "rust",
+      "package-name": "Sam",
+      "include-component-in-tag": false
+    }
+  }
+}
