@@ -4,5 +4,13 @@
   "labels": ["renovatebot"],
   "minimumReleaseAge": "1 day",
   "internalChecksFilter": "strict",
-  "pinDigests": false
+  "pinDigests": false,
+  "packageRules": [
+    {
+      "description": "ratatui-image only builds against one ratatui release, so they must move together",
+      "matchManagers": ["cargo"],
+      "matchPackageNames": ["ratatui", "ratatui-image", "crossterm"],
+      "groupName": "ratatui"
+    }
+  ]
 }
