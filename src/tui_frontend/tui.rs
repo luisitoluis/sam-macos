@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use super::images::{Images, Slot};
 use super::worker::{self, Job, StatValue, UiEvent};
 use crate::backend::app_lister::{AppModel, AppModelType};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
@@ -190,6 +191,7 @@ struct GameView {
     app_id: u32,
     name: String,
     developer: String,
+    image_url: Option<String>,
     kind: AppModelType,
     tab: GameTab,
     loading: bool,
@@ -229,6 +231,7 @@ struct App {
     update_tx: Sender<UpdateCheck>,
     update_rx: Receiver<UpdateCheck>,
     update_check: UpdateCheck,
+    images: Images,
     quit: bool,
 }
 
@@ -306,6 +309,7 @@ impl App {
             update_tx,
             update_rx,
             update_check: UpdateCheck::Idle,
+            images: Images::new(),
             quit: false,
         }
     }
@@ -326,6 +330,7 @@ impl App {
         while let Ok(update) = self.update_rx.try_recv() {
             self.update_check = update;
         }
+        self.images.poll();
     }
 
     fn handle(&mut self, event: UiEvent) {
@@ -819,6 +824,7 @@ impl App {
             app_id: app.app_id,
             name: app.app_name,
             developer: app.developer,
+            image_url: app.image_url,
             kind: app.app_type,
             tab: GameTab::Achievements,
             loading: true,
@@ -953,6 +959,7 @@ impl App {
     }
 
     fn draw(&mut self, frame: &mut Frame) {
+        self.images.begin_frame();
         let area = frame.area();
         let background = palette(self.theme).background;
         frame.render_widget(
@@ -990,10 +997,16 @@ impl App {
         let block = library_block(text::t(self.language, Id::Library), focused, &palette);
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        let preview_height = if inner.height >= MIN_HEIGHT_FOR_PREVIEW {
+            CAPSULE_ROWS + 1
+        } else {
+            0
+        };
         let parts = Layout::vertical([
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
+            Constraint::Length(preview_height),
             Constraint::Length(1),
         ])
         .split(inner);
@@ -1065,9 +1078,22 @@ impl App {
                 &mut state,
             );
         }
+        if !self.overlay()
+            && let Some(url) = apps
+                .get(self.library_index)
+                .and_then(|app| app.image_url.as_deref())
+        {
+            let preview = Rect {
+                y: parts[3].y + 1,
+                height: parts[3].height.saturating_sub(1),
+                ..parts[3]
+            };
+            self.images
+                .render(frame, preview, Slot::LibraryPreview, url);
+        }
         frame.render_widget(
             Paragraph::new(format!("Sam {}", env!("CARGO_PKG_VERSION"))).style(palette.dim),
-            parts[3],
+            parts[4],
         );
     }
 
@@ -1082,6 +1108,7 @@ impl App {
         let block = bordered(title, focused, &palette);
         let inner = block.inner(area);
         frame.render_widget(block, area);
+        let show_images = !self.overlay();
         let Some(game) = self.game.as_mut() else {
             let body =
                 Layout::vertical([Constraint::Percentage(35), Constraint::Min(1)]).split(inner);
@@ -1104,15 +1131,46 @@ impl App {
         let achievements_label = text::t(language, Id::Achievements);
         let stats_label = text::t(language, Id::Stats);
         let tab = game.tab;
+        let capsule = game
+            .image_url
+            .as_deref()
+            .filter(|_| inner.width >= MIN_WIDTH_FOR_HEADER_CAPSULE);
+        let header_height = if capsule.is_some() { CAPSULE_ROWS + 1 } else { 1 };
+        let detail_height = match tab {
+            GameTab::Achievements => ICON_ROWS,
+            GameTab::Stats => 3,
+        };
         let parts = Layout::vertical([
-            Constraint::Length(1),
+            Constraint::Length(header_height),
             Constraint::Length(1),
             Constraint::Length(1),
             Constraint::Min(1),
-            Constraint::Length(3),
+            Constraint::Length(detail_height),
         ])
         .split(inner);
-        frame.render_widget(Paragraph::new(header).style(palette.dim), parts[0]);
+        if let Some(url) = capsule {
+            let header_parts = Layout::horizontal([
+                Constraint::Length(CAPSULE_COLS),
+                Constraint::Length(2),
+                Constraint::Min(1),
+            ])
+            .split(Rect {
+                height: CAPSULE_ROWS,
+                ..parts[0]
+            });
+            if show_images {
+                self.images
+                    .render(frame, header_parts[0], Slot::GameHeader, url);
+            }
+            frame.render_widget(
+                Paragraph::new(header)
+                    .style(palette.dim)
+                    .wrap(Wrap { trim: true }),
+                header_parts[2],
+            );
+        } else {
+            frame.render_widget(Paragraph::new(header).style(palette.dim), parts[0]);
+        }
         let tabs = Line::from(vec![
             Span::styled(
                 format!(" {achievements_label} "),
@@ -1199,15 +1257,29 @@ impl App {
                     parts[3],
                     &mut state,
                 );
-                let detail = visible
+                let selected = visible
                     .get(game.achievement_index)
-                    .map(|index| achievement_detail(&game.achievements[*index], language))
+                    .map(|index| &game.achievements[*index]);
+                let detail_parts = Layout::horizontal([
+                    Constraint::Length(ICON_COLS),
+                    Constraint::Length(2),
+                    Constraint::Min(1),
+                ])
+                .split(parts[4]);
+                if show_images
+                    && let Some(url) = selected.and_then(achievement_icon_url)
+                {
+                    self.images
+                        .render(frame, detail_parts[0], Slot::AchievementIcon, url);
+                }
+                let detail = selected
+                    .map(|achievement| achievement_detail(achievement, language))
                     .unwrap_or_default();
                 frame.render_widget(
                     Paragraph::new(detail)
                         .style(palette.dim)
                         .wrap(Wrap { trim: true }),
-                    parts[4],
+                    detail_parts[2],
                 );
             }
             GameTab::Stats => {
@@ -1835,6 +1907,24 @@ fn progress_bar(done: usize, total: usize, width: usize) -> String {
     };
     let filled = filled.min(width);
     format!("{}{}", "█".repeat(filled), "░".repeat(width - filled))
+}
+
+/// Terminal cells are roughly twice as tall as they are wide. Steam capsules
+/// are close to 8:3 and achievement icons are square.
+const CAPSULE_ROWS: u16 = 5;
+const CAPSULE_COLS: u16 = 27;
+const ICON_ROWS: u16 = 4;
+const ICON_COLS: u16 = 8;
+const MIN_HEIGHT_FOR_PREVIEW: u16 = 18;
+const MIN_WIDTH_FOR_HEADER_CAPSULE: u16 = 52;
+
+fn achievement_icon_url(achievement: &AchievementInfo) -> Option<&str> {
+    let url = if achievement.is_achieved || achievement.icon_locked.ends_with('/') {
+        &achievement.icon_normal
+    } else {
+        &achievement.icon_locked
+    };
+    (url.starts_with("http") && !url.ends_with('/')).then_some(url.as_str())
 }
 
 fn achievement_detail(achievement: &AchievementInfo, language: Language) -> String {
