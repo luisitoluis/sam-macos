@@ -373,6 +373,7 @@ struct GameView {
     app_id: u32,
     name: String,
     developer: String,
+    image_url: Option<String>,
     kind: AppModelType,
     tab: GameTab,
     loading: bool,
@@ -568,6 +569,7 @@ impl SamApp {
                 .map(|app| app.app_name.clone())
                 .unwrap_or_else(|| format!("{} {app_id}", text::t(self.language, Id::AppWord))),
             developer: app.map(|app| app.developer.clone()).unwrap_or_default(),
+            image_url: app.and_then(|app| app.image_url.clone()),
             kind: app.map(|app| app.app_type).unwrap_or(AppModelType::App),
             tab: GameTab::Achievements,
             loading: true,
@@ -912,12 +914,16 @@ impl SamApp {
                     let app = &self.apps[index];
                     let app_id = app.app_id;
                     let name = app.app_name.clone();
+                    let image_url = app.image_url.clone();
                     let response = clickable_card(
                         ui,
                         egui::Id::new(("library-row", app_id)),
                         selected == Some(app_id),
                         |ui| {
-                            ui.add(egui::Label::new(name).truncate());
+                            ui.horizontal(|ui| {
+                                game_capsule(ui, image_url.as_deref(), LIBRARY_CAPSULE_SIZE);
+                                ui.add(egui::Label::new(name).truncate());
+                            });
                         },
                     );
                     if idle && response.clicked() {
@@ -1128,21 +1134,27 @@ fn show_game(
             }
         });
     });
-    ui.label(
-        egui::RichText::new(&game.name)
-            .size(36.0)
-            .strong()
-            .color(ui.visuals().text_color()),
-    );
-    ui.label(
-        egui::RichText::new(format!(
-            "{} · {} · {}",
-            game.app_id,
-            text::t(language, kind_id(game.kind)),
-            game.developer
-        ))
-        .color(ui.visuals().weak_text_color()),
-    );
+    ui.horizontal(|ui| {
+        ui.spacing_mut().item_spacing.x = 16.0;
+        game_capsule(ui, game.image_url.as_deref(), HEADER_CAPSULE_SIZE);
+        ui.vertical(|ui| {
+            ui.label(
+                egui::RichText::new(&game.name)
+                    .size(36.0)
+                    .strong()
+                    .color(ui.visuals().text_color()),
+            );
+            ui.label(
+                egui::RichText::new(format!(
+                    "{} · {} · {}",
+                    game.app_id,
+                    text::t(language, kind_id(game.kind)),
+                    game.developer
+                ))
+                .color(ui.visuals().weak_text_color()),
+            );
+        });
+    });
 
     if game.loading {
         ui.horizontal(|ui| {
@@ -1465,6 +1477,29 @@ fn achievement_icon(ui: &mut egui::Ui, url: &str) {
             .fit_to_exact_size(size)
             .corner_radius(8),
     );
+}
+
+/// Steam small capsules and logos are both close to 8:3.
+const LIBRARY_CAPSULE_SIZE: egui::Vec2 = egui::vec2(56.0, 21.0);
+const HEADER_CAPSULE_SIZE: egui::Vec2 = egui::vec2(184.0, 69.0);
+
+/// Loads the image only while its rect is on screen, so scrolling a large
+/// library does not fetch every capsule at once.
+fn game_capsule(ui: &mut egui::Ui, url: Option<&str>, size: egui::Vec2) {
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
+        return;
+    }
+    let corner = (size.y * 0.2).round().min(8.0) as u8;
+    ui.painter()
+        .rect_filled(rect, corner, ui.visuals().faint_bg_color);
+    if let Some(url) = url.filter(|url| url.starts_with("http")) {
+        egui::Image::new(url)
+            .corner_radius(corner)
+            .fit_to_exact_size(size)
+            .show_loading_spinner(false)
+            .paint_at(ui, rect);
+    }
 }
 
 fn problem_banner(ui: &mut egui::Ui, message: &str) {
