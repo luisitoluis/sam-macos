@@ -46,12 +46,6 @@ if ! xcode-select -p >/dev/null 2>&1; then
   abort "Finish the Command Line Tools install, then run this script again."
 fi
 
-if [[ "$(uname -m)" == "arm64" && ! -f /Library/Apple/usr/libexec/oah/libRosettaRuntime ]]; then
-  ohai "Installing Rosetta 2"
-  /usr/sbin/softwareupdate --install-rosetta --agree-to-license \
-    || abort "Rosetta 2 is required on Apple Silicon. Install it, then run this script again."
-fi
-
 if ! have git; then
   abort "git was not found. Reinstall the Xcode Command Line Tools and run this script again."
 fi

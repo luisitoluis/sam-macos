@@ -56,10 +56,9 @@ impl SteamLocator {
     }
 
     /// macOS version - tries multiple approaches to find a working steam client library.
-    /// Note: There is NO official libsteam_api.dylib for Apple Silicon. We try:
     /// 1. Custom SAM_STEAMCLIENT_PATH env var
-    /// 2. Linux steamclient.so via Rosetta 2 (if user has it)
-    /// 3. Standard Steam installation paths
+    /// 2. The native steamclient.dylib shipped inside the macOS Steam client
+    /// 3. A Linux steamclient.so, for older setups
     #[cfg(target_os = "macos")]
     pub fn get_steamclient_lib_path(silent: bool) -> Option<PathBuf> {
         use std::path::Path;
@@ -75,9 +74,10 @@ impl SteamLocator {
             .into_iter()
             .flat_map(|path| {
                 vec![
-                    path.join("linux64/steamclient.so"),  // Linux client via Rosetta
-                    path.join("../MacOS/steamclient.so"), // Inside Steam.app (legacy)
-                    path.join("steamclient.so"),          // Root level
+                    path.join("Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib"),
+                    path.join("linux64/steamclient.so"),
+                    path.join("../MacOS/steamclient.so"),
+                    path.join("steamclient.so"),
                 ]
             })
             .filter(|path| path.exists())
@@ -89,19 +89,15 @@ impl SteamLocator {
                     "[STEAM LOCATOR] Using Steam client library: {}",
                     first_path.display()
                 );
-                eprintln!(
-                    "[STEAM LOCATOR] Note: If using steamclient.so on Apple Silicon, ensure Rosetta 2 is enabled"
-                );
             }
             return Some(first_path.clone());
         }
 
         if !silent {
             eprintln!("[STEAM LOCATOR] Warning: Could not find steam client library on macOS");
-            eprintln!("[STEAM LOCATOR] Expected locations:");
-            eprintln!("[STEAM LOCATOR]   - ~/.local/share/Steam/linux64/steamclient.so");
+            eprintln!("[STEAM LOCATOR] Expected location:");
             eprintln!(
-                "[STEAM LOCATOR]   - ~/Library/Application Support/Steam/linux64/steamclient.so"
+                "[STEAM LOCATOR]   - ~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib"
             );
         }
 

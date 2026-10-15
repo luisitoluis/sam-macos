@@ -51,6 +51,7 @@ pub fn run(auto_open: Option<u32>) -> u8 {
             app.restore();
             install_look(&cc.egui_ctx, app.theme);
             install_onest(&cc.egui_ctx);
+            egui_extras::install_image_loaders(&cc.egui_ctx);
             Ok(Box::new(app))
         }),
     ) {
@@ -1253,6 +1254,11 @@ fn show_achievements(
                 };
                 let description = achievement.description.clone();
                 let percent = achievement.global_achieved_percent;
+                let icon = if achievement.is_achieved || achievement.icon_locked.ends_with('/') {
+                    achievement.icon_normal.clone()
+                } else {
+                    achievement.icon_locked.clone()
+                };
                 card_frame(ui, false).show(ui, |ui| {
                     ui.horizontal(|ui| {
                         let checkbox = ui.add_enabled(
@@ -1265,6 +1271,7 @@ fn show_achievements(
                                 unlocked: achieved,
                             });
                         }
+                        achievement_icon(ui, &icon);
                         ui.vertical(|ui| {
                             ui.strong(name);
                             if !description.is_empty() {
@@ -1440,6 +1447,24 @@ fn paint_chevron(painter: &egui::Painter, center: egui::Pos2, color: egui::Color
     let stroke = egui::Stroke::new(1.6, color);
     painter.line_segment([points[0], points[1]], stroke);
     painter.line_segment([points[1], points[2]], stroke);
+}
+
+const ACHIEVEMENT_ICON_SIZE: f32 = 48.0;
+
+fn achievement_icon(ui: &mut egui::Ui, url: &str) {
+    let size = egui::vec2(ACHIEVEMENT_ICON_SIZE, ACHIEVEMENT_ICON_SIZE);
+    let has_icon = url.starts_with("http") && !url.ends_with('/');
+    if !has_icon {
+        let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+        ui.painter()
+            .rect_filled(rect, 8, ui.visuals().faint_bg_color);
+        return;
+    }
+    ui.add(
+        egui::Image::new(url)
+            .fit_to_exact_size(size)
+            .corner_radius(8),
+    );
 }
 
 fn problem_banner(ui: &mut egui::Ui, message: &str) {

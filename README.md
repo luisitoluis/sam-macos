@@ -22,25 +22,21 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 
 **Key features:**
 - ✅ Native macOS support (All Apple Silicon)
-- ✅ Uses Steam Linux client via Rosetta 2
+- ✅ Uses the steamclient.dylib that ships with Steam for macOS
 - ✅ No .NET Framework required
 - ✅ Native macOS window 
 
 ## Requirements
 
-1. **Steam installed** on your Mac
-2. **Rosetta 2** (for Apple Silicon users):
-   ```bash
-   /usr/sbin/softwareupdate --install-rosetta
-   ```
-3. **Rust** (to build from source):
+1. **Steam installed** on your Mac, open and signed in
+2. **Rust** (to build from source):
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 ## Installation
 
-Installs the window, Rust, and Rosetta 2 when they are missing. The command is `sam`.
+Installs the window, and Rust when it is missing. The command is `sam`.
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
@@ -75,22 +71,22 @@ After building, `sam-tui` from any directory opens the terminal interface. `sam-
 
 ## How it works on macOS
 
-Since Valve never released a native `libsteam_api.dylib` for macOS (especially for Apple Silicon), this fork:
+The macOS Steam client ships a universal (arm64 and x86_64) `steamclient.dylib`. Sam:
 
-1. **Locates the Steam installation** in standard macOS locations
-2. **Uses the Linux `steamclient.so`** library
-3. **Runs via Rosetta 2** to translate Linux binaries to ARM64
-4. **Loads the library** via standard `dlopen`
+1. **Finds it** at `~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib`
+2. **Loads it** with `dlopen`
+3. **Talks to the running Steam client** through the same interfaces SamRewritten uses on Linux
 
-This is the same approach that many other Steam tools use on macOS.
+A Linux `steamclient.so` is still picked up as a fallback if the dylib is missing.
 
 ## Known Issues
 
-- **Apple Silicon**: Requires Rosetta 2 - the Steam Linux client runs in userspace translation
-- **Intel Macs**: Should work more directly but untested
-- **First launch**: May take a few seconds as Rosetta translates the binary
+- **Intel Macs**: Should work, but untested
 
 ## Troubleshooting
+
+### "Steam connection failed"
+Open Steam and sign in before starting Sam.
 
 ### "Could not find steam client library"
 ```bash
@@ -98,12 +94,7 @@ This is the same approach that many other Steam tools use on macOS.
 open -a Steam
 
 # Or set the path manually:
-export SAM_STEAMCLIENT_PATH=~/.local/share/Steam/linux64/steamclient.so
-```
-
-### "Rosetta 2 not installed"
-```bash
-/usr/sbin/softwareupdate --install-rosetta
+export SAM_STEAMCLIENT_PATH="$HOME/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib"
 ```
 
 ### "Failed to open library"

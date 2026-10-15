@@ -113,10 +113,20 @@ impl<'a> AppLister<'a> {
             "[ORCHESTRATOR] Downloading app list from:  {}",
             &self.app_list_url
         );
-        let response = reqwest::blocking::get(&self.app_list_url)
-            .unwrap()
-            .text()
+        // The host can take close to a minute; reqwest's default 30 s timeout is too short.
+        let client = reqwest::blocking::Client::builder()
+            .timeout(Duration::from_secs(180))
+            .build()
             .map_err(|_| SamError::AppListRetrievalFailed)?;
+        let response = client
+            .get(&self.app_list_url)
+            .send()
+            .and_then(|response| response.error_for_status())
+            .and_then(|response| response.text())
+            .map_err(|err| {
+                dev_println!("[ORCHESTRATOR] App list download failed: {err}");
+                SamError::AppListRetrievalFailed
+            })?;
         Ok(response)
     }
 
@@ -146,24 +156,30 @@ impl<'a> AppLister<'a> {
             Err(_) => true,
         };
 
-        let xml_games: XmlGames;
-
-        if should_update {
-            let app_list_str = self.download_app_list_str()?;
-            xml_games = self.load_app_list_str(&app_list_str)?;
-
-            dev_println!(
-                "[ORCHESTRATOR] App list loaded. Saving in:  {}",
-                &self.app_list_local
-            );
-            fs::write(&self.app_list_local, &app_list_str)
-                .map_err(|_| SamError::AppListRetrievalFailed)?;
-        } else {
+        if !should_update {
             dev_println!("[ORCHESTRATOR] Loading app list from local location");
-            xml_games = self.load_app_list_file()?;
+            return self.load_app_list_file();
         }
 
-        Ok(xml_games)
+        let downloaded = self
+            .download_app_list_str()
+            .and_then(|source| self.load_app_list_str(&source).map(|games| (source, games)));
+        match downloaded {
+            Ok((source, xml_games)) => {
+                dev_println!(
+                    "[ORCHESTRATOR] App list loaded. Saving in:  {}",
+                    &self.app_list_local
+                );
+                if fs::write(&self.app_list_local, &source).is_err() {
+                    dev_println!("[ORCHESTRATOR] Could not cache the app list");
+                }
+                Ok(xml_games)
+            }
+            Err(err) => {
+                dev_println!("[ORCHESTRATOR] Using the cached app list, if any");
+                self.load_app_list_file().map_err(|_| err)
+            }
+        }
     }
 
     fn get_app_image_url(&self, app_id: &AppId_t) -> Option<String> {
@@ -258,8 +274,10 @@ impl<'a> AppLister<'a> {
                 continue;
             }
 
-            let app = self.get_app(app_id, &xml_game)?;
-            models.push(app)
+            match self.get_app(app_id, &xml_game) {
+                Ok(app) => models.push(app),
+                Err(_) => dev_println!("[ORCHESTRATOR] Skipping app {app_id}: no app data"),
+            }
         }
 
         Ok(models)
