@@ -1078,6 +1078,13 @@ impl App {
                 &mut state,
             );
         }
+        if preview_height > 0 {
+            for app in neighbours(&apps, self.library_index) {
+                if let Some(url) = app.image_url.as_deref() {
+                    self.images.prefetch(url);
+                }
+            }
+        }
         if !self.overlay()
             && let Some(url) = apps
                 .get(self.library_index)
@@ -1266,6 +1273,11 @@ impl App {
                     Constraint::Min(1),
                 ])
                 .split(parts[4]);
+                for index in neighbours(&visible, game.achievement_index) {
+                    if let Some(url) = achievement_icon_url(&game.achievements[*index]) {
+                        self.images.prefetch(url);
+                    }
+                }
                 if show_images
                     && let Some(url) = selected.and_then(achievement_icon_url)
                 {
@@ -1917,6 +1929,18 @@ const ICON_ROWS: u16 = 4;
 const ICON_COLS: u16 = 8;
 const MIN_HEIGHT_FOR_PREVIEW: u16 = 18;
 const MIN_WIDTH_FOR_HEADER_CAPSULE: u16 = 52;
+
+const PREFETCH_AROUND: usize = 4;
+
+/// Items near `selected`, farthest first, so the fetcher (newest first) loads
+/// the closest ones before the rest.
+fn neighbours<T>(items: &[T], selected: usize) -> impl Iterator<Item = &T> {
+    (1..=PREFETCH_AROUND).rev().flat_map(move |distance| {
+        let before = selected.checked_sub(distance).and_then(|index| items.get(index));
+        let after = items.get(selected + distance);
+        before.into_iter().chain(after)
+    })
+}
 
 fn achievement_icon_url(achievement: &AchievementInfo) -> Option<&str> {
     let url = if achievement.is_achieved || achievement.icon_locked.ends_with('/') {

@@ -21,6 +21,7 @@ use crate::gui_frontend::request::{
     UnlockAllAchievements,
 };
 use crate::text::{self, Id, Language, Message};
+use super::image_loader::CachedHttpLoader;
 use super::theme::GuiTheme;
 use eframe::egui;
 use std::collections::HashMap;
@@ -52,6 +53,8 @@ pub fn run(auto_open: Option<u32>) -> u8 {
             install_look(&cc.egui_ctx, app.theme);
             install_onest(&cc.egui_ctx);
             egui_extras::install_image_loaders(&cc.egui_ctx);
+            cc.egui_ctx
+                .add_bytes_loader(std::sync::Arc::new(CachedHttpLoader::new()));
             Ok(Box::new(app))
         }),
     ) {
@@ -1465,18 +1468,19 @@ const ACHIEVEMENT_ICON_SIZE: f32 = 48.0;
 
 fn achievement_icon(ui: &mut egui::Ui, url: &str) {
     let size = egui::vec2(ACHIEVEMENT_ICON_SIZE, ACHIEVEMENT_ICON_SIZE);
-    let has_icon = url.starts_with("http") && !url.ends_with('/');
-    if !has_icon {
-        let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
-        ui.painter()
-            .rect_filled(rect, 8, ui.visuals().faint_bg_color);
+    let (rect, _) = ui.allocate_exact_size(size, egui::Sense::hover());
+    if !ui.is_rect_visible(rect) {
         return;
     }
-    ui.add(
+    ui.painter()
+        .rect_filled(rect, 8, ui.visuals().faint_bg_color);
+    if url.starts_with("http") && !url.ends_with('/') {
         egui::Image::new(url)
             .fit_to_exact_size(size)
-            .corner_radius(8),
-    );
+            .corner_radius(8)
+            .show_loading_spinner(false)
+            .paint_at(ui, rect);
+    }
 }
 
 /// Steam small capsules and logos are both close to 8:3.

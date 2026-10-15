@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::utils::image_cache::ImageFetcher;
 use image::DynamicImage;
 use ratatui::Frame;
 use ratatui::layout::Rect;
@@ -21,13 +22,9 @@ use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::{FilterType, Resize, StatefulImage};
 use std::collections::HashMap;
 use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Arc, Mutex};
-use std::thread;
-use std::time::Duration;
 
-const FETCHERS: usize = 4;
 /// Decoded images kept in memory. Past this, finished entries are dropped and
-/// fetched again when shown.
+/// read again from the disk cache when shown.
 const MAX_DECODED: usize = 256;
 /// Encoded protocols are tied to one render size, so each place an image is
 /// shown gets its own entry.
@@ -50,7 +47,8 @@ pub struct Images {
     picker: Picker,
     decoded: HashMap<String, Decoded>,
     protocols: HashMap<(String, Slot), StatefulProtocol>,
-    requests: Sender<String>,
+    fetcher: ImageFetcher,
+    loaded_tx: Sender<(String, Option<DynamicImage>)>,
     loaded: Receiver<(String, Option<DynamicImage>)>,
     shown_before: HashMap<Slot, (String, Rect)>,
     shown_now: HashMap<Slot, (String, Rect)>,
@@ -61,19 +59,13 @@ impl Images {
     /// first terminal event is read: the picker queries the terminal on stdio.
     pub fn new() -> Self {
         let picker = Picker::from_query_stdio().unwrap_or_else(|_| Picker::halfblocks());
-        let (request_tx, request_rx) = mpsc::channel::<String>();
         let (loaded_tx, loaded_rx) = mpsc::channel();
-        let request_rx = Arc::new(Mutex::new(request_rx));
-        for _ in 0..FETCHERS {
-            let requests = Arc::clone(&request_rx);
-            let loaded = loaded_tx.clone();
-            thread::spawn(move || fetcher(requests, loaded));
-        }
         Self {
             picker,
             decoded: HashMap::new(),
             protocols: HashMap::new(),
-            requests: request_tx,
+            fetcher: ImageFetcher::new(),
+            loaded_tx,
             loaded: loaded_rx,
             shown_before: HashMap::new(),
             shown_now: HashMap::new(),
@@ -110,6 +102,7 @@ impl Images {
             .get(&slot)
             .is_some_and(|(shown_url, shown_area)| shown_url != url || *shown_area != area)
         {
+            self.prefetch(url);
             return;
         }
         let key = (url.to_owned(), slot);
@@ -143,40 +136,20 @@ impl Images {
             self.decoded
                 .retain(|_, entry| matches!(entry, Decoded::Loading));
         }
-        if self.requests.send(url.to_owned()).is_ok() {
-            self.decoded.insert(url.to_owned(), Decoded::Loading);
-        }
+        self.decoded.insert(url.to_owned(), Decoded::Loading);
+        let loaded = self.loaded_tx.clone();
+        let key = url.to_owned();
+        self.fetcher.fetch(url, move |bytes| {
+            let image = bytes.and_then(|bytes| image::load_from_memory(&bytes).ok());
+            let _ = loaded.send((key, image));
+        });
         None
     }
-}
 
-fn fetcher(
-    requests: Arc<Mutex<Receiver<String>>>,
-    loaded: Sender<(String, Option<DynamicImage>)>,
-) {
-    let Ok(client) = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(20))
-        .build()
-    else {
-        return;
-    };
-    loop {
-        let next = match requests.lock() {
-            Ok(requests) => requests.recv(),
-            Err(_) => return,
-        };
-        let Ok(url) = next else {
-            return;
-        };
-        let image = client
-            .get(&url)
-            .send()
-            .and_then(|response| response.error_for_status())
-            .and_then(|response| response.bytes())
-            .ok()
-            .and_then(|bytes| image::load_from_memory(&bytes).ok());
-        if loaded.send((url, image)).is_err() {
-            return;
+    /// Starts loading `url` in the background so it is ready when shown.
+    pub fn prefetch(&mut self, url: &str) {
+        if !self.decoded.contains_key(url) {
+            let _ = self.image(url);
         }
     }
 }
