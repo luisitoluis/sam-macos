@@ -14,7 +14,7 @@
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 use super::worker::{self, Job, StatValue, UiEvent};
-use crate::backend::app_lister::{AppModel, AppModelType};
+use crate::backend::app_lister::{AppModel, AppModelType, cached_owned_apps};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
 use crate::text::{self, Id, Language, Message};
 use crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
@@ -207,6 +207,7 @@ struct App {
     events: Receiver<UiEvent>,
     worker: Option<JoinHandle<()>>,
     inflight: u32,
+    loading_apps: bool,
     apps: Vec<AppModel>,
     search: String,
     hide_junk: bool,
@@ -241,7 +242,7 @@ pub fn run() -> io::Result<()> {
         let (jobs, events, worker) = worker::spawn();
         let mut app = App::new(jobs, events, worker);
         app.restore();
-        app.send(Job::LoadApps);
+        app.load_apps();
         let result = event_loop(&mut terminal, &mut app);
         app.store();
         let _ = app.jobs.send(Job::Shutdown);
@@ -281,7 +282,8 @@ impl App {
             events,
             worker: Some(worker),
             inflight: 0,
-            apps: Vec::new(),
+            loading_apps: false,
+            apps: cached_owned_apps().map(sorted_apps).unwrap_or_default(),
             search: String::new(),
             hide_junk: true,
             library_index: 0,
@@ -310,6 +312,11 @@ impl App {
         }
     }
 
+    fn load_apps(&mut self) {
+        self.loading_apps = true;
+        self.send(Job::LoadApps);
+    }
+
     fn send(&mut self, job: Job) {
         self.inflight += 1;
         if self.jobs.send(job).is_err() {
@@ -331,14 +338,23 @@ impl App {
     fn handle(&mut self, event: UiEvent) {
         match event {
             UiEvent::Apps(result) => match result {
-                Ok(mut apps) => {
-                    apps.sort_by(|a, b| a.app_name.to_lowercase().cmp(&b.app_name.to_lowercase()));
+                Ok(apps) => {
+                    self.loading_apps = false;
+                    let selected = self
+                        .visible_apps()
+                        .get(self.library_index)
+                        .map(|app| app.app_id);
                     let count = apps.len();
-                    self.apps = apps;
-                    self.library_index = 0;
+                    self.apps = sorted_apps(apps);
+                    self.library_index = selected
+                        .and_then(|id| self.visible_apps().iter().position(|app| app.app_id == id))
+                        .unwrap_or(0);
                     self.notice = Some(Ok(Message::Games(count)));
                 }
-                Err(err) => self.notice = Some(Err(Message::Own(err))),
+                Err(err) => {
+                    self.loading_apps = false;
+                    self.notice = Some(Err(Message::Own(err)));
+                }
             },
             UiEvent::Details {
                 app_id,
@@ -751,7 +767,7 @@ impl App {
             game.loading = true;
             self.send(Job::Reload(app_id));
         } else {
-            self.send(Job::LoadApps);
+            self.load_apps();
         }
     }
 
@@ -785,14 +801,19 @@ impl App {
     }
 
     fn activate(&mut self) {
-        if self.inflight > 0 {
-            return;
-        }
         if self.pane == Pane::Library {
+            // Opening queues behind a library refresh, so the cached list
+            // stays usable while it runs.
+            if self.inflight > u32::from(self.loading_apps) {
+                return;
+            }
             let Some(app) = self.visible_apps().get(self.library_index).cloned() else {
                 return;
             };
             self.open_app(app);
+            return;
+        }
+        if self.inflight > 0 {
             return;
         }
         if self
@@ -1902,6 +1923,11 @@ fn centered(area: Rect, width: u16, height: u16) -> Rect {
         width,
         height,
     }
+}
+
+fn sorted_apps(mut apps: Vec<AppModel>) -> Vec<AppModel> {
+    apps.sort_by_cached_key(|app| app.app_name.to_lowercase());
+    apps
 }
 
 fn kind_id(kind: AppModelType) -> Id {

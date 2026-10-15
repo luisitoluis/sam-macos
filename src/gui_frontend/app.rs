@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU General Public License
 // along with this program. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::backend::app_lister::{AppModel, AppModelType};
+use crate::backend::app_lister::{AppModel, AppModelType, cached_owned_apps};
 use crate::backend::stat_definitions::{AchievementInfo, StatInfo};
 use crate::gui_frontend::request::{
     GetAchievements, GetStats, GetSubscribedAppList, LaunchApp, Request, ResetStats,
@@ -407,6 +407,7 @@ struct SamApp {
     update_tx: Sender<UpdateCheck>,
     update_rx: Receiver<UpdateCheck>,
     update_check: UpdateCheck,
+    loading_apps: bool,
 }
 
 impl SamApp {
@@ -437,9 +438,22 @@ impl SamApp {
             update_tx,
             update_rx,
             update_check: UpdateCheck::Idle,
+            loading_apps: false,
         };
-        app.send(Job::LoadApps);
+        if let Some(apps) = cached_owned_apps() {
+            app.apps = sorted_apps(apps);
+        }
+        app.load_apps();
+        if let Some(app_id) = app.auto_open.filter(|id| app.apps.iter().any(|a| a.app_id == *id)) {
+            app.auto_open = None;
+            app.open_app(app_id);
+        }
         app
+    }
+
+    fn load_apps(&mut self) {
+        self.loading_apps = true;
+        self.send(Job::LoadApps);
     }
 
     fn send(&mut self, job: Job) {
@@ -466,16 +480,19 @@ impl SamApp {
     fn handle(&mut self, event: UiEvent) {
         match event {
             UiEvent::Apps(result) => match result {
-                Ok(mut apps) => {
-                    apps.sort_by(|a, b| a.app_name.to_lowercase().cmp(&b.app_name.to_lowercase()));
+                Ok(apps) => {
+                    self.loading_apps = false;
                     let count = apps.len();
-                    self.apps = apps;
+                    self.apps = sorted_apps(apps);
                     self.notice = Some(Ok(Message::Games(count)));
                     if let Some(app_id) = self.auto_open.take() {
                         self.open_app(app_id);
                     }
                 }
-                Err(err) => self.notice = Some(Err(Message::Own(err))),
+                Err(err) => {
+                    self.loading_apps = false;
+                    self.notice = Some(Err(Message::Own(err)));
+                }
             },
             UiEvent::Details {
                 app_id,
@@ -588,7 +605,7 @@ impl SamApp {
 
     fn apply(&mut self, action: UiAction) {
         match action {
-            UiAction::RefreshApps => self.send(Job::LoadApps),
+            UiAction::RefreshApps => self.load_apps(),
             UiAction::Open(app_id) => self.open_app(app_id),
             UiAction::Close => {
                 if let Some(game) = self.game.take() {
@@ -905,7 +922,9 @@ impl SamApp {
         }
 
         let selected = self.game.as_ref().map(|game| game.app_id);
-        let idle = self.inflight == 0;
+        // Opening a game queues behind a library refresh, so the cached list
+        // stays clickable while it runs.
+        let idle = self.inflight == u32::from(self.loading_apps);
         let footer_height = 20.0;
         let scroll_height = (ui.available_height() - footer_height).max(0.0);
         egui::ScrollArea::vertical()
@@ -1646,6 +1665,11 @@ fn query_update() -> UpdateCheck {
         }
         _ => UpdateCheck::Failed,
     }
+}
+
+fn sorted_apps(mut apps: Vec<AppModel>) -> Vec<AppModel> {
+    apps.sort_by_cached_key(|app| app.app_name.to_lowercase());
+    apps
 }
 
 fn kind_id(kind: AppModelType) -> Id {

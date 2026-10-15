@@ -25,6 +25,8 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 pub struct AppLister<'a> {
@@ -108,28 +110,6 @@ impl<'a> AppLister<'a> {
         }
     }
 
-    fn download_app_list_str(&self) -> Result<String, SamError> {
-        dev_println!(
-            "[ORCHESTRATOR] Downloading app list from:  {}",
-            &self.app_list_url
-        );
-        // The host can take close to a minute; reqwest's default 30 s timeout is too short.
-        let client = reqwest::blocking::Client::builder()
-            .timeout(Duration::from_secs(180))
-            .build()
-            .map_err(|_| SamError::AppListRetrievalFailed)?;
-        let response = client
-            .get(&self.app_list_url)
-            .send()
-            .and_then(|response| response.error_for_status())
-            .and_then(|response| response.text())
-            .map_err(|err| {
-                dev_println!("[ORCHESTRATOR] App list download failed: {err}");
-                SamError::AppListRetrievalFailed
-            })?;
-        Ok(response)
-    }
-
     fn load_app_list_file(&self) -> Result<XmlGames, SamError> {
         let f = File::open(&self.app_list_local).map_err(|_| SamError::AppListRetrievalFailed)?;
         let f = BufReader::new(f);
@@ -138,48 +118,34 @@ impl<'a> AppLister<'a> {
         Ok(xml_data)
     }
 
-    fn load_app_list_str(&self, source: &str) -> Result<XmlGames, SamError> {
-        let xml_data: XmlGames =
-            quick_xml::de::from_str(source).map_err(|_| SamError::AppListRetrievalFailed)?;
-        Ok(xml_data)
-    }
-
+    /// A cached list is always used right away, even when it is old: the
+    /// download can take close to a minute. Old lists are refreshed in the
+    /// background for the next load.
     fn get_xml_games(&self) -> Result<XmlGames, SamError> {
-        let should_update = match fs::metadata(&self.app_list_local) {
-            Ok(metadata) => {
-                let last_update = metadata
-                    .modified()
-                    .map_err(|_| SamError::AppListRetrievalFailed)?;
-                let one_week_ago = SystemTime::now() - Duration::from_secs(7 * 24 * 60 * 60); // 7 days
-                last_update < one_week_ago
-            }
-            Err(_) => true,
-        };
+        let age = fs::metadata(&self.app_list_local)
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .map(|modified| SystemTime::now().duration_since(modified).unwrap_or_default());
 
-        if !should_update {
-            dev_println!("[ORCHESTRATOR] Loading app list from local location");
-            return self.load_app_list_file();
-        }
-
-        let downloaded = self
-            .download_app_list_str()
-            .and_then(|source| self.load_app_list_str(&source).map(|games| (source, games)));
-        match downloaded {
-            Ok((source, xml_games)) => {
-                dev_println!(
-                    "[ORCHESTRATOR] App list loaded. Saving in:  {}",
-                    &self.app_list_local
-                );
-                if fs::write(&self.app_list_local, &source).is_err() {
-                    dev_println!("[ORCHESTRATOR] Could not cache the app list");
+        if let Some(age) = age {
+            match self.load_app_list_file() {
+                Ok(xml_games) => {
+                    dev_println!("[ORCHESTRATOR] Loading app list from local location");
+                    if age > APP_LIST_MAX_AGE {
+                        refresh_app_list_in_background(
+                            self.app_list_url.clone(),
+                            self.app_list_local.clone(),
+                        );
+                    }
+                    return Ok(xml_games);
                 }
-                Ok(xml_games)
-            }
-            Err(err) => {
-                dev_println!("[ORCHESTRATOR] Using the cached app list, if any");
-                self.load_app_list_file().map_err(|_| err)
+                Err(_) => dev_println!("[ORCHESTRATOR] Cached app list is unreadable"),
             }
         }
+
+        let (source, xml_games) = download_app_list(&self.app_list_url)?;
+        store_app_list(&self.app_list_local, &source);
+        Ok(xml_games)
     }
 
     fn get_app_image_url(&self, app_id: &AppId_t) -> Option<String> {
@@ -261,6 +227,12 @@ impl<'a> AppLister<'a> {
     }
 
     pub fn get_owned_apps(&self) -> Result<Vec<AppModel>, SamError> {
+        let models = self.scan_owned_apps()?;
+        store_owned_apps(&models);
+        Ok(models)
+    }
+
+    fn scan_owned_apps(&self) -> Result<Vec<AppModel>, SamError> {
         let xml_games = self.get_xml_games()?;
 
         // IClientUserStats::GetNumAchievedAchievements( 291550, ) = 0,
@@ -282,4 +254,72 @@ impl<'a> AppLister<'a> {
 
         Ok(models)
     }
+}
+
+const APP_LIST_MAX_AGE: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+const OWNED_APPS_FILE: &str = "/owned_apps.json";
+
+static APP_LIST_REFRESHING: AtomicBool = AtomicBool::new(false);
+
+fn download_app_list(url: &str) -> Result<(String, XmlGames), SamError> {
+    dev_println!("[ORCHESTRATOR] Downloading app list from:  {url}");
+    // The host can take close to a minute; reqwest's default 30 s timeout is too short.
+    let client = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(180))
+        .build()
+        .map_err(|_| SamError::AppListRetrievalFailed)?;
+    let source = client
+        .get(url)
+        .send()
+        .and_then(|response| response.error_for_status())
+        .and_then(|response| response.text())
+        .map_err(|err| {
+            dev_println!("[ORCHESTRATOR] App list download failed: {err}");
+            SamError::AppListRetrievalFailed
+        })?;
+    let xml_games =
+        quick_xml::de::from_str(&source).map_err(|_| SamError::AppListRetrievalFailed)?;
+    Ok((source, xml_games))
+}
+
+fn refresh_app_list_in_background(url: String, local: String) {
+    if APP_LIST_REFRESHING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    thread::spawn(move || {
+        if let Ok((source, _)) = download_app_list(&url) {
+            store_app_list(&local, &source);
+        }
+        APP_LIST_REFRESHING.store(false, Ordering::SeqCst);
+    });
+}
+
+fn store_app_list(local: &str, source: &str) {
+    dev_println!("[ORCHESTRATOR] App list loaded. Saving in:  {local}");
+    if !write_atomically(local, source.as_bytes()) {
+        dev_println!("[ORCHESTRATOR] Could not cache the app list");
+    }
+}
+
+/// The owned apps found by the last full scan. Frontends show these while a
+/// new scan runs, because checking every known app with Steam takes seconds.
+pub fn cached_owned_apps() -> Option<Vec<AppModel>> {
+    let raw = fs::read(get_app_cache_dir() + OWNED_APPS_FILE).ok()?;
+    serde_json::from_slice(&raw).ok()
+}
+
+fn store_owned_apps(apps: &[AppModel]) {
+    if let Ok(raw) = serde_json::to_vec(apps) {
+        write_atomically(&(get_app_cache_dir() + OWNED_APPS_FILE), &raw);
+    }
+}
+
+/// Another process may be reading the same file, so it never sees half of it.
+fn write_atomically(path: &str, bytes: &[u8]) -> bool {
+    let temp = format!("{path}.tmp{}", std::process::id());
+    if fs::write(&temp, bytes).is_ok() && fs::rename(&temp, path).is_ok() {
+        return true;
+    }
+    let _ = fs::remove_file(&temp);
+    false
 }
