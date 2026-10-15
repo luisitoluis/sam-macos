@@ -150,19 +150,36 @@ fn tune_spacing(style: &mut egui::Style) {
         .insert(egui::TextStyle::Monospace, egui::FontId::monospace(13.0));
 }
 
+fn mix(base: egui::Color32, tint: egui::Color32, amount: f32) -> egui::Color32 {
+    let [br, bg, bb, ba] = base.to_array();
+    let [tr, tg, tb, ta] = tint.to_array();
+    let lerp = |from: u8, to: u8| (from as f32 + (to as f32 - from as f32) * amount).round() as u8;
+    egui::Color32::from_rgba_unmultiplied(lerp(br, tr), lerp(bg, tg), lerp(bb, tb), lerp(ba, ta))
+}
+
+fn channel_gap(a: egui::Color32, b: egui::Color32) -> u16 {
+    let [ar, ag, ab, _] = a.to_array();
+    let [br, bg, bb, _] = b.to_array();
+    u16::from(ar.abs_diff(br)) + u16::from(ag.abs_diff(bg)) + u16::from(ab.abs_diff(bb))
+}
+
 fn tune_visuals(visuals: &mut egui::Visuals, palette: &super::theme::Palette) {
-    let ink = palette.text;
-    let muted = palette.muted;
-    let hairline = palette.border;
     let canvas = palette.background;
-    let card = palette.background;
-    let field = palette.border;
+    let ink = palette.text;
+    let muted = if channel_gap(palette.muted, ink) < 48 {
+        mix(ink, canvas, 0.42)
+    } else {
+        palette.muted
+    };
+    let hairline = mix(canvas, palette.border, 0.55);
+    let card = canvas;
+    let field = mix(canvas, palette.border, 0.28);
     let accent = palette.primary;
-    let accent_soft = palette.primary;
-    let button = palette.background;
-    let button_hover = palette.border;
+    let accent_soft = mix(canvas, palette.primary, 0.24);
+    let button = canvas;
+    let button_hover = mix(canvas, ink, 0.08);
     let dark = {
-        let [r, g, b, _] = palette.background.to_array();
+        let [r, g, b, _] = canvas.to_array();
         u16::from(r) + u16::from(g) + u16::from(b) < 380
     };
     let radius = egui::CornerRadius::same(14);
@@ -193,14 +210,14 @@ fn tune_visuals(visuals: &mut egui::Visuals, palette: &super::theme::Palette) {
     visuals.widgets.hovered.bg_fill = button_hover;
     visuals.widgets.hovered.weak_bg_fill = button_hover;
 
-    visuals.widgets.active.fg_stroke = egui::Stroke::new(1.5, accent);
-    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, accent);
+    visuals.widgets.active.fg_stroke = egui::Stroke::new(1.0, accent);
+    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, mix(canvas, accent, 0.45));
     visuals.widgets.active.bg_fill = accent_soft;
     visuals.widgets.active.weak_bg_fill = accent_soft;
     visuals.widgets.open = visuals.widgets.hovered;
 
     visuals.selection.bg_fill = accent_soft;
-    visuals.selection.stroke = egui::Stroke::new(1.0, canvas);
+    visuals.selection.stroke = egui::Stroke::new(1.0, ink);
     visuals.hyperlink_color = accent;
     visuals.dark_mode = dark;
     visuals.faint_bg_color = field;
@@ -951,7 +968,7 @@ impl eframe::App for SamApp {
         let mut actions = Vec::new();
         paint_backdrop(ui);
         let rail = ui.visuals().panel_fill;
-        egui::Panel::left("library")
+        let library = egui::Panel::left("library")
             .resizable(true)
             .default_size(220.0)
             .min_size(180.0)
@@ -965,12 +982,18 @@ impl eframe::App for SamApp {
                 }),
             )
             .show(ui, |ui| actions.extend(self.library_ui(ui)));
+        let divider = ui.visuals().widgets.noninteractive.bg_stroke.color;
+        ui.painter().vline(
+            library.response.rect.right(),
+            ui.ctx().viewport_rect().y_range(),
+            egui::Stroke::new(1.0, divider),
+        );
         egui::CentralPanel::default()
             .frame(
                 egui::Frame::new()
                     .fill(egui::Color32::TRANSPARENT)
                     .inner_margin(egui::Margin {
-                        left: 28,
+                        left: 18,
                         right: 28,
                         top: 50,
                         bottom: 22,
@@ -1274,19 +1297,23 @@ fn show_stats(
 
 fn problem_banner(ui: &mut egui::Ui, message: &str) {
     let message = message.strip_prefix("SAM: ").unwrap_or(message).trim();
+    let visuals = ui.visuals();
+    let fill = mix(visuals.panel_fill, visuals.text_color(), 0.1);
+    let text = visuals.text_color();
+    let accent = if channel_gap(visuals.error_fg_color, fill) > 160 {
+        visuals.error_fg_color
+    } else {
+        text
+    };
     let width = (ui.available_width() - 34.0).max(0.0);
     egui::Frame::new()
-        .fill(ui.visuals().faint_bg_color)
-        .stroke(egui::Stroke::new(1.0, ui.visuals().error_fg_color))
+        .fill(fill)
+        .stroke(egui::Stroke::new(1.0, accent))
         .corner_radius(14)
         .inner_margin(egui::Margin::symmetric(16, 12))
         .show(ui, |ui| {
             ui.set_min_width(width);
-            ui.label(
-                egui::RichText::new(message)
-                    .size(15.0)
-                    .color(ui.visuals().error_fg_color),
-            );
+            ui.label(egui::RichText::new(message).size(15.0).color(text));
         });
 }
 
@@ -1337,10 +1364,6 @@ fn clickable_card(
     let width = (ui.available_width() - if selected { 26.0 } else { 24.0 }).max(0.0);
     let inner = row_frame(ui, selected).show(ui, |ui| {
         ui.set_min_width(width);
-        if selected {
-            let on_primary = ui.visuals().window_fill();
-            ui.style_mut().visuals.override_text_color = Some(on_primary);
-        }
         body(ui);
     });
     ui.interact(inner.response.rect, id, egui::Sense::click())
@@ -1364,7 +1387,7 @@ fn primary_button(ui: &mut egui::Ui, enabled: bool, label: &str) -> egui::Respon
 fn segment(ui: &mut egui::Ui, selected: bool, label: &str) -> egui::Response {
     let visuals = ui.visuals();
     let color = if selected {
-        visuals.window_fill()
+        visuals.text_color()
     } else {
         visuals.weak_text_color()
     };
