@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/luisitoluis/sam-macos-rs/compare/v1.0.1...v1.0.2) (2026-10-16)
+
+
+### Bug Fixes
+
+* update version to 1.0.2 in Cargo.toml and Cargo.lock; reflect new release in installation scripts and README ([14aa32b](https://github.com/luisitoluis/sam-macos-rs/commit/14aa32be8d9a481f64509478179ae309931d1ef2))
+
 ## [1.0.1](https://github.com/luisitoluis/sam-macos-rs/compare/v1.0.0...v1.0.1) (2026-10-15)
 
 
