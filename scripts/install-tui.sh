@@ -52,7 +52,7 @@ Install the $LABEL ($DEST_NAME).
 
 Options:
   --method METHOD   auto (default), binary or source
-  --version TAG     Install a specific release, e.g. v1.0.1 (default: latest)
+  --version TAG     Install a specific release, e.g. v1.0.2 (default: latest)
   --dir DIR         Command directory (default: \$HOME/.local/bin)
   --app-dir DIR     Where the GUI's Sam.app goes (default: \$HOME/Applications)
   --insecure        Skip checksum verification (not recommended)

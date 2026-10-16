@@ -59,7 +59,7 @@ Rust when it is missing). Settings are passed as environment variables in front 
 | Variable | Effect |
 | --- | --- |
 | `SAM_METHOD=source` | Always build from source. `binary` never falls back. |
-| `SAM_VERSION=v1.0.1` | Install that release instead of the latest. |
+| `SAM_VERSION=v1.0.2` | Install that release instead of the latest. |
 | `SAM_BIN_DIR=/path` | Put the `sam` / `sam-tui` command somewhere other than `~/.local/bin`. |
 | `SAM_APP_DIR=/path` | Put `Sam.app` somewhere other than `~/Applications`. |
 
