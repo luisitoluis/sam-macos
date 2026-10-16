@@ -29,14 +29,19 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 ## Requirements
 
 1. **Steam installed** on your Mac, open and signed in
-2. **Rust** (to build from source):
+2. **Rust**, only if you build from source:
    ```bash
    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
    ```
 
 ## Installation
 
-Installs the window, and Rust when it is missing. The command is `sam`.
+The installers download the prebuilt binary for your Mac (Apple Silicon or Intel) from the
+[latest release](https://github.com/luisitoluis/sam-macos-rs/releases/latest), check it against
+the release's `checksums.txt` and install it. No Rust needed.
+
+Installs the window as `Sam.app` in `~/Applications`, so it opens from Launchpad, Spotlight or
+Finder without a Terminal window. The `sam` command opens the same app.
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
@@ -48,6 +53,20 @@ Installs the terminal UI. The command is `sam-tui`.
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install-tui.sh)"
 ```
 
+If a release has no binary for your Mac, the installer builds it from source instead (installing
+Rust when it is missing). Settings are passed as environment variables in front of the command:
+
+| Variable | Effect |
+| --- | --- |
+| `SAM_METHOD=source` | Always build from source. `binary` never falls back. |
+| `SAM_VERSION=v1.0.2` | Install that release instead of the latest. |
+| `SAM_BIN_DIR=/path` | Put the `sam` / `sam-tui` command somewhere other than `~/.local/bin`. |
+| `SAM_APP_DIR=/path` | Put `Sam.app` somewhere other than `~/Applications`. |
+
+```bash
+SAM_METHOD=source /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
+```
+
 To build them yourself:
 
 ```bash
@@ -55,17 +74,22 @@ git clone https://github.com/luisitoluis/sam-macos-rs.git
 cd sam-macos-rs
 ```
 
-GUI, written to `target/release/Sam`:
+Both at once, written to `target/release/Sam.app` (GUI) and `target/release/sam-tui` (TUI):
 
 ```bash
-cargo build --bin Sam --no-default-features --features gui
+cargo build --release
 ```
 
-TUI, written to `target/release/sam-tui`:
+Only the GUI, or only the TUI:
 
 ```bash
-cargo build --bin sam-tui --no-default-features --features cli
+cargo build --release --bin sam --no-default-features --features gui
+cargo build --release --bin sam-tui --no-default-features --features cli
 ```
+
+`Sam.app` opens without Terminal. Cargo still writes the bare `sam` executable next to it, but it
+is hidden in Finder because double-clicking it would open Terminal. Drag `Sam.app` to
+`~/Applications` to keep it.
 
 After building, `sam-tui` from any directory opens the terminal interface. `sam-tui --version` prints the version.
 
@@ -81,7 +105,7 @@ A Linux `steamclient.so` is still picked up as a fallback if the dylib is missin
 
 ## Known Issues
 
-- **Intel Macs**: Should work, but untested
+- **Intel Macs**: Binaries are published for every release, but untested
 
 ## Troubleshooting
 

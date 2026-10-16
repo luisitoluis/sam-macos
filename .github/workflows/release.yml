@@ -24,6 +24,14 @@ jobs:
     needs: [ release_please ]
     if: needs.release_please.outputs.release_created == 'true'
     runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch: arm64
+          - target: x86_64-apple-darwin
+            arch: amd64
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -31,16 +39,40 @@ jobs:
           ref: ${{ needs.release_please.outputs.tag_name }}
 
       - name: Install Rust toolchain
-        run: rustup update stable
+        run: |
+          rustup update stable
+          rustup target add ${{ matrix.target }}
 
       - name: Build macOS GUI and CLI
-        run: cargo build --release
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Set sam-tui icon
+        run: target/set-icon "target/${{ matrix.target }}/release/sam-tui" assets/icon_256.png
 
       - name: Upload binaries to the release
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ needs.release_please.outputs.tag_name }}
         run: |
-          archive="sam-${TAG}-macos-$(uname -m).tar.gz"
-          tar -czf "$archive" -C target/release Sam sam-tui
+          version="${TAG#v}"
+          out="target/${{ matrix.target }}/release"
+          archive="sam_${version}_darwin_${{ matrix.arch }}.tar.gz"
+          stage="$(mktemp -d)"
+          scripts/make-app.sh "$out/sam" "$stage" "$version"
+          cp -p "$out/sam-tui" LICENSE README.md "$stage/"
+          tar -czf "$archive" -C "$stage" Sam.app sam-tui LICENSE README.md
           gh release upload "$TAG" "$archive" --clobber
+
+  checksums:
+    needs: [ release_please, build_macos ]
+    runs-on: macos-latest
+    steps:
+      - name: Upload checksums.txt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.release_please.outputs.tag_name }}
+        run: |
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'sam_*_darwin_*.tar.gz'
+          shasum -a 256 sam_*_darwin_*.tar.gz > checksums.txt
+          cat checksums.txt
+          gh release upload "$TAG" checksums.txt --repo "$GITHUB_REPOSITORY" --clobber
