@@ -10,7 +10,7 @@ fi
 
 bin_name="${CARGO_BIN_NAME:-}"
 case "$bin_name" in
-    Sam | Sam-tui | Sam_tui | sam-tui | sam_tui) ;;
+    sam | sam-tui | sam_tui) ;;
     *) exit 0 ;;
 esac
 
@@ -52,6 +52,17 @@ if [[ ! -f "$out" ]]; then
 fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
+
+# A bare executable always opens in Terminal from Finder; Sam.app next to it does not.
+# Cargo always uplifts the bare binary as a hard link of $out, so hiding $out hides it in
+# Finder and Sam.app is the only GUI entry there. Cargo parses rustc's stdout, so nothing
+# from make-app.sh may reach it.
+if [[ "$bin_name" == "sam" ]]; then
+    /bin/bash "$root/scripts/make-app.sh" "$out" "$(dirname "$(dirname "$out")")" >/dev/null 2>&1 || true
+    chflags hidden "$out" 2>/dev/null || true
+    exit 0
+fi
+
 icon="$root/assets/icon_256.png"
 tool="$root/target/set-icon"
 if [[ ! -x "$tool" || "$root/scripts/set-icon.swift" -nt "$tool" ]]; then

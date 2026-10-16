@@ -1,5 +1,5 @@
 [package]
-name = "Sam"
+name = "sam"
 version = "1.0.1"
 description = "Steam Achievement Manager Rewritten"
 edition = "2024"
@@ -38,7 +38,7 @@ libc = "0"
 lto = "thin"
 
 [[bin]]
-name = "Sam"
+name = "sam"
 path = "src/main.rs"
 required-features = ["gui"]
 
