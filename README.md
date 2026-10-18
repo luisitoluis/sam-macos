@@ -36,6 +36,22 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 
 ## Installation
 
+### Homebrew
+
+Installs the window (`sam`) and the terminal UI (`sam-tui`):
+
+```bash
+brew install luisitoluis/tap/sam
+```
+
+`Sam.app` stays inside Homebrew's folder. To also open it from Finder, Launchpad or Spotlight:
+
+```bash
+ln -sfn "$(brew --prefix sam)/Sam.app" ~/Applications/Sam.app
+```
+
+### Script
+
 The installers download the prebuilt binary for your Mac (Apple Silicon or Intel) from the
 [latest release](https://github.com/luisitoluis/sam-macos-rs/releases/latest), check it against
 the release's `checksums.txt` and install it. No Rust needed.
@@ -62,10 +78,44 @@ Rust when it is missing). Settings are passed as environment variables in front 
 | `SAM_VERSION=v1.0.2` | Install that release instead of the latest. |
 | `SAM_BIN_DIR=/path` | Put the `sam` / `sam-tui` command somewhere other than `~/.local/bin`. |
 | `SAM_APP_DIR=/path` | Put `Sam.app` somewhere other than `~/Applications`. |
-
 ```bash
 SAM_METHOD=source /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
 ```
+
+### Uninstall
+
+Removes what the matching script installed: `Sam.app` and the `sam` command, or `sam-tui`. The
+cloned source in `~/.sam` and the `PATH` line in your shell profile go too, once neither the
+window nor the terminal UI is left.
+
+```bash
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall.sh)"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall-tui.sh)"
+```
+
+To also delete Sam's cache and settings, which the window and the terminal UI share:
+
+```bash
+SAM_PURGE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall.sh)"
+```
+
+Installed with Homebrew? Use `brew uninstall sam` instead.
+
+### Downloading the release with a browser
+
+Sam is not notarized by Apple, so a copy downloaded from the releases page with a browser is
+blocked the first time ("Apple could not verify Sam..."). Homebrew and the script above download
+with `curl`, which does not trigger this. If you downloaded the archive anyway, after extracting it
+either run:
+
+```bash
+xattr -dr com.apple.quarantine Sam.app sam-tui
+```
+
+or try to open Sam once, then go to **System Settings → Privacy & Security** and click
+**Open Anyway**.
+
+### Build from source
 
 To build them yourself:
 
