@@ -10,7 +10,7 @@ authors = [
 ]
 
 [dependencies]
-eframe = { version = "0.36", optional = true }
+eframe = { version = "0.37", optional = true }
 egui_extras = { version = "0.37", features = ["image"], optional = true }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png"], optional = true }
 ratatui = { version = "0.30", optional = true }
