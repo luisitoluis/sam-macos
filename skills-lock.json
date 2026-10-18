@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "skills": {
+    "bash-defensive-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "autoskills-registry",
+      "computedHash": "2c6409224fbb56ceff6655b73cb03a736ea6c89e622734752c568efafd59a964"
+    },
+    "rust-best-practices": {
+      "source": "apollographql/skills",
+      "sourceType": "autoskills-registry",
+      "computedHash": "5ab83ce09897beb788b95be5fb855310ed5027551126befbd1e38ebc358d1c19"
+    }
+  }
+}
