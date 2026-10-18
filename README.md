@@ -1,76 +1,57 @@
-Steam Achievement Manager For macOS 
-===
+# Steam Achievement Manager For macOS 
 
-<p align=center>
-    <img src="assets/icon_256.png" alt="SamRewrittenLogo">
-</p>
+[![GitHub stars](https://img.shields.io/github/stars/luisitoluis/sam-macos-rs?style=flat&labelColor=0a0a0a&color=eab308)](https://github.com/luisitoluis/sam-macos-rs/stargazers)
+[![GitHub Forks](https://img.shields.io/github/forks/luisitoluis/sam-macos-rs?style=flat&labelColor=0a0a0a&color=3b82f6)](https://github.com/luisitoluis/sam-macos-rs/forks)
+[![GitHub PRs](https://img.shields.io/github/issues-pr/luisitoluis/sam-macos-rs?style=flat&labelColor=0a0a0a&color=22c55e)](https://github.com/luisitoluis/sam-macos-rs/pulls)
+[![GitHub issues](https://img.shields.io/github/issues/luisitoluis/sam-macos-rs?style=flat&labelColor=0a0a0a&color=ef4444)](https://github.com/luisitoluis/sam-macos-rs/issues)
+[![GitHub Contributors](https://img.shields.io/github/contributors/luisitoluis/sam-macos-rs?style=flat&labelColor=0a0a0a&color=f97316)](https://github.com/luisitoluis/sam-macos-rs/graphs/contributors)
 
-<p align="center">A Steam Achievement Manager for macOS.</p>
-<p align="center">
-    <a href="https://github.com/luisitoluis/sam-rust-mac">DOWNLOAD</a>
-</p>
+<img src="assets/sam-gui.jpg" alt="Sam" width="49%"> <img src="assets/sam-tui.jpg" alt="sam-tui" width="49%">
 
-<p align=center>
-    <em>
-        This fork adds native macOS Apple Silicon support to SamRewritten.
-    </em>
-</p>
+![Rust](https://img.shields.io/badge/Rust-2024-orange?style=for-the-badge&logo=rust)
+![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon%20%26%20Intel-black?style=for-the-badge&logo=apple)
 
-## What is this fork?
+A Steam Achievement Manager for macOS: a native window and a terminal UI.
 
-This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) that adds macOS support (Apple Silicon & Intel).
+Fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) with Apple Silicon and Intel builds. It uses the `steamclient.dylib` that ships with Steam for macOS. No .NET Framework.
 
-**Key features:**
-- ✅ Native macOS support (All Apple Silicon)
-- ✅ Uses the steamclient.dylib that ships with Steam for macOS
-- ✅ No .NET Framework required
-- ✅ Native macOS window 
+Visit the [GitHub repository](https://github.com/luisitoluis/sam-macos-rs) to get more information.
 
-## Requirements
+## Installation :book:
 
-1. **Steam installed** on your Mac, open and signed in
-2. **Rust**, only if you build from source:
-   ```bash
-   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-   ```
+Steam needs to be installed, opened, and signed in before the first run.
 
-## Installation
+#### Homebrew
 
-### Homebrew
-
-The window (`sam`):
+> The window. The command is `sam`:
 
 ```bash
 brew install luisitoluis/tap/sam
 ```
 
-The terminal UI (`sam-tui`):
+> The terminal UI. The command is `sam-tui`:
 
 ```bash
 brew install luisitoluis/tap/sam-tui
 ```
 
-### Script
+#### Script
 
-The installers download the prebuilt binary for your Mac (Apple Silicon or Intel) from the
-[latest release](https://github.com/luisitoluis/sam-macos-rs/releases/latest), check it against
-the release's `checksums.txt` and install it. No Rust needed.
+> The installers download the prebuilt binary for your Mac from the [latest release](https://github.com/luisitoluis/sam-macos-rs/releases/latest) and check it against `checksums.txt`. No Rust needed. If a release has no binary for your Mac, the installer builds it from source.
 
-Installs the window as `Sam.app` in `~/Applications`, so it opens from Launchpad, Spotlight or
-Finder without a Terminal window. The `sam` command opens the same app.
+- Window. `Sam.app` goes in `~/Applications`, so it opens from Launchpad, Spotlight, or Finder. The command is `sam`:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
 ```
 
-Installs the terminal UI. The command is `sam-tui`.
+- Terminal UI. The command is `sam-tui`:
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install-tui.sh)"
 ```
 
-If a release has no binary for your Mac, the installer builds it from source instead (installing
-Rust when it is missing). Settings are passed as environment variables in front of the command:
+> Settings go in front of the command:
 
 | Variable | Effect |
 | --- | --- |
@@ -78,108 +59,125 @@ Rust when it is missing). Settings are passed as environment variables in front 
 | `SAM_VERSION=v1.0.2` | Install that release instead of the latest. |
 | `SAM_BIN_DIR=/path` | Put the `sam` / `sam-tui` command somewhere other than `~/.local/bin`. |
 | `SAM_APP_DIR=/path` | Put `Sam.app` somewhere other than `~/Applications`. |
+
 ```bash
 SAM_METHOD=source /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/install.sh)"
 ```
 
-### Uninstall
+#### Uninstall
 
-The window (`Sam.app` and the `sam` command):
+> Each script removes only that install. The cloned source in `~/.sam` and the `PATH` line go too, once the other one is already gone.
+
+- Window (`Sam.app` and `sam`):
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall.sh)"
 ```
 
-The terminal UI (`sam-tui`):
+- Terminal UI (`sam-tui`):
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall-tui.sh)"
 ```
 
-Each script removes only that install. The cloned source in `~/.sam` and the `PATH` line in your
-shell profile go too, once the other one is already gone. `SAM_PURGE=1` in front of the command
-deletes the shared cache and settings only when the other install is gone as well.
+> `SAM_PURGE=1` in front of either command deletes the shared cache and settings only when the other install is already gone.
 
-Installed with Homebrew? The window, then the terminal UI:
+- Homebrew, the window, then the terminal UI:
 
 ```bash
 brew uninstall sam
 brew uninstall sam-tui
 ```
 
-### Downloading the release with a browser
+#### Browser download
 
-Sam is not notarized by Apple, so a copy downloaded from the releases page with a browser is
-blocked the first time ("Apple could not verify Sam..."). Homebrew and the script above download
-with `curl`, which does not trigger this. If you downloaded the archive anyway, after extracting it
-either run:
+> Sam is not notarized by Apple. A copy downloaded from the releases page with a browser is blocked the first time ("Apple could not verify Sam..."). This applies to both `Sam.app` and `sam-tui`. Homebrew and the scripts download with `curl`, which does not trigger this.
+
+After extracting the archive, either run:
 
 ```bash
 xattr -dr com.apple.quarantine Sam.app sam-tui
 ```
 
-or try to open Sam once, then go to **System Settings → Privacy & Security** and click
-**Open Anyway**.
+or try to open each one once (`./sam-tui` from Terminal for the TUI), then go to **System Settings → Privacy & Security** and click **Open Anyway**.
 
-### Build from source
+#### Build from source
 
-To build them yourself:
+> Rust is only required for this path:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
 
 ```bash
 git clone https://github.com/luisitoluis/sam-macos-rs.git
 cd sam-macos-rs
 ```
 
-Both at once, written to `target/release/Sam.app` (GUI) and `target/release/sam-tui` (TUI):
+- Both, written to `target/release/Sam.app` and `target/release/sam-tui`:
 
 ```bash
 cargo build --release
 ```
 
-Only the GUI, or only the TUI:
+- Only the window, or only the terminal UI:
 
 ```bash
 cargo build --release --bin sam --no-default-features --features gui
 cargo build --release --bin sam-tui --no-default-features --features cli
 ```
 
-`Sam.app` opens without Terminal. Cargo still writes the bare `sam` executable next to it, but it
-is hidden in Finder because double-clicking it would open Terminal. Drag `Sam.app` to
-`~/Applications` to keep it.
+> `Sam.app` opens without Terminal. Cargo still writes the bare `sam` executable next to it, but it is hidden in Finder because double-clicking it would open Terminal. Drag `Sam.app` to `~/Applications` to keep it.
 
-After building, `sam-tui` from any directory opens the terminal interface. `sam-tui --version` prints the version.
+`sam-tui --version` prints the installed version.
 
-## How it works on macOS
+## Usage :gear:
+
+- `sam` opens the window.
+- `sam-tui` opens the terminal UI.
+
+Steam has to have been launched once so `steamclient.dylib` exists.
+
+## How it works :wrench:
 
 The macOS Steam client ships a universal (arm64 and x86_64) `steamclient.dylib`. Sam:
 
-1. **Finds it** at `~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib`
-2. **Loads it** with `dlopen`
-3. **Talks to the running Steam client** through the same interfaces SamRewritten uses on Linux
+1. Finds it at `~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib`
+2. Loads it with `dlopen`
+3. Talks to the running Steam client through the same interfaces SamRewritten uses on Linux
 
 A Linux `steamclient.so` is still picked up as a fallback if the dylib is missing.
 
-## Known Issues
+## Troubleshooting :sos:
 
-- **Intel Macs**: Binaries are published for every release, but untested
+#### "Steam connection failed"
 
-## Troubleshooting
+> Open Steam and sign in before starting Sam.
 
-### "Steam connection failed"
-Open Steam and sign in before starting Sam.
+#### "Could not find steam client library"
 
-### "Could not find steam client library"
 ```bash
-# Make sure Steam has been launched at least once
 open -a Steam
+```
 
-# Or set the path manually:
+```bash
 export SAM_STEAMCLIENT_PATH="$HOME/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamclient.dylib"
 ```
 
-### "Failed to open library"
-Ensure your Steam is installed and you've launched it at least once to generate the necessary files.
+#### "Failed to open library"
+
+> Launch Steam once so it can create the library files.
+
+#### Intel Macs
+
+> Binaries are published for every release, but untested.
 
 ## License
 
- GPL-3.0 - See LICENSE file.
+GPL-3.0. See [LICENSE](LICENSE).
+
+## Contributors 👑
+
+<a href="https://github.com/luisitoluis/sam-macos-rs/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=luisitoluis/sam-macos-rs" />
+</a>
