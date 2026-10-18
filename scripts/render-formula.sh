@@ -37,13 +37,17 @@ mkdir -p "$outdir"
 
 urls() {
   cat <<EOF
-  on_arm do
-    url "$base/sam_${version}_darwin_arm64.tar.gz"
-    sha256 "$arm_sha"
-  end
-  on_intel do
-    url "$base/sam_${version}_darwin_amd64.tar.gz"
-    sha256 "$intel_sha"
+  depends_on :macos
+
+  on_macos do
+    on_arm do
+      url "$base/sam_${version}_darwin_arm64.tar.gz"
+      sha256 "$arm_sha"
+    end
+    on_intel do
+      url "$base/sam_${version}_darwin_amd64.tar.gz"
+      sha256 "$intel_sha"
+    end
   end
 EOF
 }
@@ -52,12 +56,9 @@ cat >"$outdir/sam.rb" <<EOF
 class Sam < Formula
   desc "Steam Achievement Manager for macOS"
   homepage "https://github.com/luisitoluis/sam-macos-rs"
-  version "$version"
   license "GPL-3.0-only"
 
 $(urls)
-
-  depends_on :macos
 
   def install
     prefix.install "Sam.app"
@@ -77,7 +78,7 @@ $(urls)
   end
 
   test do
-    assert_predicate prefix/"Sam.app/Contents/Info.plist", :exist?
+    assert_path_exists prefix/"Sam.app/Contents/Info.plist"
   end
 end
 EOF
@@ -86,12 +87,9 @@ cat >"$outdir/sam-tui.rb" <<EOF
 class SamTui < Formula
   desc "Steam Achievement Manager for macOS (terminal UI)"
   homepage "https://github.com/luisitoluis/sam-macos-rs"
-  version "$version"
   license "GPL-3.0-only"
 
 $(urls)
-
-  depends_on :macos
 
   def install
     bin.install "sam-tui"
