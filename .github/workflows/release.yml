@@ -115,14 +115,14 @@ jobs:
           gh release download "$TAG" --pattern checksums.txt
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/luisitoluis/homebrew-tap.git" tap
           mkdir -p tap/Formula
-          scripts/render-formula.sh "$TAG" checksums.txt > tap/Formula/sam.rb
+          scripts/render-formula.sh "$TAG" checksums.txt tap/Formula
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add Formula/sam.rb
+          git add Formula/sam.rb Formula/sam-tui.rb
           if git diff --cached --quiet; then
             echo "Formula already up to date."
           else
-            git commit -m "sam ${TAG#v}"
+            git commit -m "sam and sam-tui ${TAG#v}"
             git push
           fi

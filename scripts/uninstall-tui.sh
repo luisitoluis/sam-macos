@@ -38,7 +38,7 @@ Uninstall the $LABEL ($DEST_NAME).
 
 Options:
   --dir DIR         Command directory used at install time (default: \$HOME/.local/bin)
-  --purge           Also delete Sam's cache and settings (shared by the window and the terminal UI)
+  --purge           Also delete the shared cache and settings, unless sam is still installed
   -h, --help        Show this help
 
 The same settings can be given as SAM_BIN_DIR and SAM_PURGE=1
@@ -172,17 +172,21 @@ else
 fi
 
 if [[ "$PURGE" == "1" ]]; then
-  for dir in "$HOME/Library/Caches/samrewritten" "$HOME/Library/Application Support/Sam"; do
-    if [[ -e "$dir" ]]; then
-      rm -rf "$dir"
-      ohai "Removed $dir"
-      removed=1
-    fi
-  done
+  if other_installed; then
+    warn "$OTHER_NAME is still installed, so the shared cache and settings stay."
+  else
+    for dir in "$HOME/Library/Caches/samrewritten" "$HOME/Library/Application Support/Sam"; do
+      if [[ -e "$dir" ]]; then
+        rm -rf "$dir"
+        ohai "Removed $dir"
+        removed=1
+      fi
+    done
+  fi
 fi
 
-if command -v brew >/dev/null 2>&1 && brew list --formula sam >/dev/null 2>&1; then
-  warn "Sam is also installed with Homebrew. Remove that copy with: brew uninstall sam"
+if command -v brew >/dev/null 2>&1 && brew list --formula sam-tui >/dev/null 2>&1; then
+  warn "The terminal UI is also installed with Homebrew. Remove that copy with: brew uninstall sam-tui"
 fi
 
 if [[ "$removed" == "1" ]]; then

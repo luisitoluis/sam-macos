@@ -38,16 +38,16 @@ This is a fork of [SamRewritten](https://github.com/PaulCombal/SamRewritten) tha
 
 ### Homebrew
 
-Installs the window (`sam`) and the terminal UI (`sam-tui`):
+The window (`sam`):
 
 ```bash
 brew install luisitoluis/tap/sam
 ```
 
-`Sam.app` stays inside Homebrew's folder. To also open it from Finder, Launchpad or Spotlight:
+The terminal UI (`sam-tui`):
 
 ```bash
-ln -sfn "$(brew --prefix sam)/Sam.app" ~/Applications/Sam.app
+brew install luisitoluis/tap/sam-tui
 ```
 
 ### Script
@@ -84,22 +84,28 @@ SAM_METHOD=source /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/l
 
 ### Uninstall
 
-Removes what the matching script installed: `Sam.app` and the `sam` command, or `sam-tui`. The
-cloned source in `~/.sam` and the `PATH` line in your shell profile go too, once neither the
-window nor the terminal UI is left.
+The window (`Sam.app` and the `sam` command):
 
 ```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall.sh)"
+```
+
+The terminal UI (`sam-tui`):
+
+```bash
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall-tui.sh)"
 ```
 
-To also delete Sam's cache and settings, which the window and the terminal UI share:
+Each script removes only that install. The cloned source in `~/.sam` and the `PATH` line in your
+shell profile go too, once the other one is already gone. `SAM_PURGE=1` in front of the command
+deletes the shared cache and settings only when the other install is gone as well.
+
+Installed with Homebrew? The window, then the terminal UI:
 
 ```bash
-SAM_PURGE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/luisitoluis/sam-macos-rs/master/scripts/uninstall.sh)"
+brew uninstall sam
+brew uninstall sam-tui
 ```
-
-Installed with Homebrew? Use `brew uninstall sam` instead.
 
 ### Downloading the release with a browser
 

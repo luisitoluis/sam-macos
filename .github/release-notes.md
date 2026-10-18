@@ -1,9 +1,15 @@
 ## Install
 
-Homebrew, installs the window (`sam`) and the terminal UI (`sam-tui`):
+Homebrew, the window (`sam`):
 
 ```bash
 brew install luisitoluis/tap/sam
+```
+
+Homebrew, the terminal UI (`sam-tui`):
+
+```bash
+brew install luisitoluis/tap/sam-tui
 ```
 
 Script (no Homebrew needed), the window. The command is `sam`:
