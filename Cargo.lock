@@ -2196,9 +2196,9 @@ dependencies = [
 
 [[package]]
 name = "interprocess"
-version = "2.4.9"
+version = "2.4.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f243523bf126ddfc5cddf87a8193a941bfca29476ce3c842e24c916cf5a22ec"
+checksum = "a50ad48c57a73eb3e157c55c3bf6a35cbc9c57b4ebc177d24a92b02de884388d"
 dependencies = [
  "doctest-file",
  "libc",
